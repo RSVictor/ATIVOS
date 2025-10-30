@@ -85,7 +85,7 @@ class Chamado(models.Model):
         choices=prioridade_chamado.choices,
     )
     creator = models.ForeignKey(Users, related_name='chamado_usuario_FK', on_delete=models.CASCADE)
-    employee = models.ManyToManyField(Users, related_name='chamado_funcionario_FK')
+    employee = models.ManyToManyField(Users, related_name='chamado_funcionario_FK',blank=True)
     asset = models.ForeignKey(Ativo, related_name='chamado_ativo_FK', on_delete=models.CASCADE)
     update_date = models.DateTimeField(auto_now=True)
     photo = models.TextField(null=True, blank=True)

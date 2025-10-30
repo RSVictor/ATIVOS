@@ -124,9 +124,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
+import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
+import api from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 
 export default defineComponent({
   name: 'EditarChamado',
@@ -135,6 +137,7 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter()
+      const auth = useAuthStore()
     
     // Dados simulados do chamado existente
     const titulo = ref('Erro ao acessar o painel administrativo')
@@ -146,9 +149,10 @@ export default defineComponent({
     const imagemURL = ref<string | null>(null)
 
     const usuario = ref({
-      nome: 'Lucas Santino',
-      email: 'lucas@email.com'
+      nome: auth.user?.name || 'Usuário',
+      email: auth.user?.email || 'sem@email.com'
     })
+
 
     const categorias = ref(['Manutenção', 'Suporte', 'Instalação', 'Rede', 'Software', 'Hardware'])
     const prioridades = ref([

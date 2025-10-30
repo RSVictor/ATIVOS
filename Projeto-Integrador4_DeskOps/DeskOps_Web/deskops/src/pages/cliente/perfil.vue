@@ -1,10 +1,7 @@
 <template>
   <div class="perfil-page">
     <!-- Sidebar como componente -->
-    <ClienteSidebar 
-      :user-name="usuario.nome" 
-      :user-email="usuario.email"
-    />
+   <cliente-sidebar :usuario="usuario" />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -141,48 +138,99 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive } from 'vue'
+import { defineComponent, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
+import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api'
 
 export default defineComponent({
   name: 'Perfil',
-  components: {
-    ClienteSidebar
-  },
+  components: { ClienteSidebar },
+
   setup() {
     const router = useRouter()
+    const auth = useAuthStore()
     const editMode = ref(false)
 
+    // 🔹 Estado principal do usuário
     const usuario = ref({
-      nome: 'Lucas Santino da Silva',
-      email: 'lucas@email.com',
-      dataNascimento: '01/01/1990',
-      cpf: '123.456.789-00',
-      endereco: 'Rua Exemplo, 123, São Paulo, SP',
-      tipoUsuario: 'Cliente',
-      foto: '', 
+      nome: '',
+      email: '',
+      cargo: '',
+      cpf: '',
+      ativo: '',
+      tipoUsuario: '',
+      foto: '',
     })
 
-    const usuarioEditado = reactive({ ...usuario.value })
+    // 🔹 Versão editável
+    const usuarioEditado = ref({ ...usuario.value })
 
     const defaultFoto = new URL('../../assets/images/default-avatar.png', import.meta.url).href
 
+    // ✅ Função que busca os dados do usuário logado no backend
+    const carregarDadosUsuario = async () => {
+      try {
+        const token = auth.access
+        if (!token) {
+          console.warn('⚠️ Nenhum token encontrado, redirecionando para login...')
+          router.push('/')
+          return
+        }
+
+        const response = await api.get('/me/', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        // ✅ Mapeia os campos retornados pelo seu endpoint
+        usuario.value = {
+          nome: response.data.name,
+          email: response.data.email,
+          cargo: response.data.cargo || 'Não informado',
+          cpf: response.data.cpf || '---',
+          ativo: response.data.is_active ? 'Ativo' : 'Inativo',
+          tipoUsuario: response.data.is_staff ? 'Administrador' : 'Cliente',
+          foto: '',
+        }
+
+        usuarioEditado.value = { ...usuario.value }
+        console.log('👤 Dados do usuário carregados:', usuario.value)
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados do usuário:', error.response?.data || error)
+        if (error.response?.status === 401) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+        }
+      }
+    }
+
+    // 🚀 Busca os dados assim que o componente for montado
+    onMounted(() => {
+      carregarDadosUsuario()
+    })
+
+    // 🔹 Edição local
     const enterEditMode = () => {
-      Object.assign(usuarioEditado, usuario.value)
+      usuarioEditado.value = { ...usuario.value }
       editMode.value = true
     }
 
     const cancelEdit = () => {
+      usuarioEditado.value = { ...usuario.value }
       editMode.value = false
-      Object.assign(usuarioEditado, usuario.value)
     }
 
-    const saveChanges = () => {
-      Object.assign(usuario.value, usuarioEditado)
-      editMode.value = false
-      console.log('Dados salvos:', usuario.value)
-      alert('Alterações salvas com sucesso!')
+    const saveChanges = async () => {
+      try {
+        usuario.value = { ...usuarioEditado.value }
+        editMode.value = false
+        alert('Alterações salvas com sucesso! (local)')
+      } catch (error) {
+        console.error('❌ Erro ao salvar alterações:', error)
+      }
     }
 
     const changePhoto = () => {
@@ -192,12 +240,11 @@ export default defineComponent({
       input.onchange = (e) => {
         const target = e.target as HTMLInputElement
         if (target.files && target.files[0]) {
-          const file = target.files[0]
           const reader = new FileReader()
           reader.onload = (e) => {
-            usuarioEditado.foto = e.target?.result as string
+            usuarioEditado.value.foto = e.target?.result as string
           }
-          reader.readAsDataURL(file)
+          reader.readAsDataURL(target.files[0])
         }
       }
       input.click()
@@ -206,16 +253,15 @@ export default defineComponent({
     const changePassword = () => {
       const newPassword = prompt('Digite sua nova senha:')
       if (newPassword) {
-        console.log('Nova senha definida')
-        alert('Senha alterada com sucesso!')
+        alert('Senha alterada com sucesso! (simulação)')
       }
     }
 
     return {
       usuario,
       usuarioEditado,
-      defaultFoto,
       editMode,
+      defaultFoto,
       enterEditMode,
       cancelEdit,
       saveChanges,
@@ -225,6 +271,8 @@ export default defineComponent({
   },
 })
 </script>
+
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

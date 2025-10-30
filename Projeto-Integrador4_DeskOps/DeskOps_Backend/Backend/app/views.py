@@ -140,6 +140,13 @@ class ChamadoViewSet(viewsets.ModelViewSet):
     serializer_class = ChamadoSerializer
     permission_classes = [IsAuthenticated, ChamadoPermission]
 
+    def get_serializer_context(self):
+        return {'request': self.request}
+       
+    
+    def get_queryset(self):       
+        user = self.request.user
+        return Chamado.objects.filter(creator=user)
 
 class NotificateView(ModelViewSet):
     queryset = Notificate.objects.all()

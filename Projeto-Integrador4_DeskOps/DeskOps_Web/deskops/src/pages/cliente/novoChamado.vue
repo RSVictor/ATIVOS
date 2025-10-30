@@ -1,24 +1,19 @@
 <template>
   <div class="novo-chamado-page" @click="closeProfileMenu">
-    <!-- Sidebar do Cliente como componente -->
-    <ClienteSidebar 
-      :user-name="userName" 
-      :user-email="userEmail"
-      @close-profile-menu="closeProfileMenu"
-    />
+    <!-- Sidebar do Cliente -->
+   <cliente-sidebar :usuario="usuario" />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
       <div class="content-area">
         <h1 class="page-title">Novo Chamado</h1>
 
-        <!-- Cards -->
         <div class="cards-container">
           <!-- Formulário -->
           <div class="card-form">
             <div class="card-header">
               <h2 class="card-title">Informações</h2>
-              <p class="card-subtitle">Insira as informações abaixo para realizar o cadastro</p>
+              <p class="card-subtitle">Preencha as informações para criar um novo chamado</p>
             </div>
 
             <div class="form-section">
@@ -35,7 +30,7 @@
               <h3 class="section-title">Descrição</h3>
               <textarea
                 v-model="descricao"
-                placeholder="Descreva o que está acontecendo"
+                placeholder="Descreva o problema"
                 :maxlength="maxDescricaoChars"
                 class="form-textarea"
               ></textarea>
@@ -47,19 +42,16 @@
             <div class="form-section">
               <h3 class="section-title">Categoria de Serviço</h3>
               <select v-model="categoria" class="form-select">
-                <option value="" disabled>Selecione a categoria de Serviço</option>
+                <option value="" disabled>Selecione a categoria</option>
                 <option v-for="cat in categorias" :key="cat" :value="cat">{{ cat }}</option>
               </select>
             </div>
 
-            <!-- Seletor de Prioridade Adicionado -->
             <div class="form-section">
               <h3 class="section-title">Prioridade</h3>
               <select v-model="prioridade" class="form-select">
                 <option value="" disabled>Selecione a prioridade</option>
-                <option v-for="prioridadeOption in prioridades" :key="prioridadeOption.value" :value="prioridadeOption.value">
-                  {{ prioridadeOption.label }}
-                </option>
+                <option v-for="p in prioridades" :key="p.value" :value="p.value">{{ p.label }}</option>
               </select>
             </div>
 
@@ -75,12 +67,12 @@
             </div>
           </div>
 
-          <!-- Card Resumo -->
+          <!-- Resumo -->
           <div class="card-summary">
             <h2 class="summary-title">Resumo</h2>
-            
+
             <div class="summary-section">
-              <p class="summary-label">Título do chamado</p>
+              <p class="summary-label">Título</p>
               <p class="summary-value">{{ titulo || 'Nenhum título' }}</p>
             </div>
 
@@ -90,15 +82,14 @@
             </div>
 
             <div class="summary-section">
-              <p class="summary-label">Categoria do Serviço</p>
+              <p class="summary-label">Categoria</p>
               <p class="summary-value">{{ categoria || 'Nenhuma selecionada' }}</p>
             </div>
 
-            <!-- Prioridade no Resumo Adicionada -->
             <div class="summary-section">
               <p class="summary-label">Prioridade</p>
               <p class="summary-value">
-                <span :class="['prioridade-badge', prioridadeClass(prioridade)]" v-if="prioridade">
+                <span v-if="prioridade" :class="['prioridade-badge', prioridadeClass(prioridade)]">
                   <span class="material-icons prioridade-icon">{{ prioridadeIcon(prioridade) }}</span>
                   {{ formatarPrioridade(prioridade) }}
                 </span>
@@ -109,8 +100,8 @@
             <div class="summary-section">
               <p class="summary-label">Imagem</p>
               <p class="summary-value">
-                <img v-if="imagemURL" :src="imagemURL" alt="Imagem anexada" style="max-width: 100px; max-height: 100px;">
-                <span v-else>Nenhuma imagem selecionada</span>
+                <img v-if="imagemURL" :src="imagemURL" alt="Imagem" style="max-width: 100px; max-height: 100px;">
+                <span v-else>Nenhuma imagem</span>
               </p>
             </div>
 
@@ -128,14 +119,16 @@
 import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
+import api from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 
 export default defineComponent({
   name: 'NovoChamado',
-  components: {
-    ClienteSidebar
-  },
+  components: { ClienteSidebar },
+
   setup() {
     const router = useRouter()
+    const auth = useAuthStore()
 
     const titulo = ref('')
     const descricao = ref('')
@@ -146,51 +139,45 @@ export default defineComponent({
     const prioridades = ref([
       { value: 'alta', label: 'Alta' },
       { value: 'media', label: 'Média' },
-      { value: 'baixa', label: 'Baixa' }
+      { value: 'baixa', label: 'Baixa' },
     ])
     const maxDescricaoChars = 2830
 
-    // Dados do usuário - você pode obter isso de um store ou API
-    const userName = ref('Lucas Santino')
-    const userEmail = ref('lucas@email.com')
-
-    const descricaoLimitada = computed(() => {
-      if (!descricao.value) return 'Nenhuma descrição'
-      return descricao.value.length > 100
-        ? descricao.value.substring(0, 100) + '...'
-        : descricao.value
+    const usuario = ref({
+      nome: auth.user?.name || 'Usuário',
+      email: auth.user?.email || 'sem@email.com'
     })
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada quando clicar fora do menu
-      // Você pode emitir um evento do componente sidebar se necessário
-    }
+    const closeProfileMenu = () => {}
 
-    const submitChamado = () => {
-      // Validação de campos obrigatórios
+    const submitChamado = async () => {
       if (!titulo.value || !descricao.value || !categoria.value || !prioridade.value) {
-        alert("Por favor, preencha todos os campos obrigatórios!");
-        return;
+        alert("Por favor, preencha todos os campos obrigatórios!")
+        return
       }
 
-      console.log({
-        titulo: titulo.value,
-        descricao: descricao.value,
-        categoria: categoria.value,
-        prioridade: prioridade.value,
-        imagemURL: imagemURL.value,
-      })
-      alert("Chamado enviado com sucesso!")
+      try {
+                const payload = {
+          title: titulo.value,
+          description: descricao.value,
+          prioridade: prioridade.value.toUpperCase(),
+          status: "AGUARDANDO_ATENDIMENTO",
+          photo: "",
+          asset: 1,
+          employee: [],
+        };
 
-      // Limpar formulário
-      titulo.value = ''
-      descricao.value = ''
-      categoria.value = ''
-      prioridade.value = ''
-      imagemURL.value = null
+        console.log("📤 Enviando chamado:", payload)
 
-      // Redirecionar para meus chamados
-      router.push("/cliente/meus-chamados")
+        const response = await api.post('/chamados/', payload) // ✅ rota correta
+        console.log("✅ Chamado criado:", response.data)
+
+        alert("Chamado criado com sucesso!")
+        router.push("/cliente/meus-chamados")
+      } catch (error: any) {
+        console.error("❌ Erro ao criar chamado:", error.response?.data || error)
+        alert("Erro ao criar chamado. Verifique se está logado e tente novamente.")
+      }
     }
 
     const onFileChange = (event: Event) => {
@@ -204,9 +191,8 @@ export default defineComponent({
       }
     }
 
-    // Funções para prioridade
-    const prioridadeClass = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
+    const prioridadeClass = (p: string) => {
+      switch (p.toLowerCase()) {
         case 'alta': return 'prioridade-alta'
         case 'media': return 'prioridade-media'
         case 'baixa': return 'prioridade-baixa'
@@ -214,8 +200,8 @@ export default defineComponent({
       }
     }
 
-    const prioridadeIcon = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
+    const prioridadeIcon = (p: string) => {
+      switch (p.toLowerCase()) {
         case 'alta': return 'arrow_upward'
         case 'media': return 'remove'
         case 'baixa': return 'arrow_downward'
@@ -223,12 +209,12 @@ export default defineComponent({
       }
     }
 
-    const formatarPrioridade = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
+    const formatarPrioridade = (p: string) => {
+      switch (p.toLowerCase()) {
         case 'alta': return 'Alta'
         case 'media': return 'Média'
         case 'baixa': return 'Baixa'
-        default: return prioridade
+        default: return p
       }
     }
 
@@ -240,11 +226,9 @@ export default defineComponent({
       imagemURL,
       categorias,
       prioridades,
-      userName,
-      userEmail,
+      usuario,
       submitChamado,
       onFileChange,
-      descricaoLimitada,
       maxDescricaoChars,
       closeProfileMenu,
       prioridadeClass,

@@ -58,13 +58,16 @@
                 @click="goToChamadoDetalhado(chamado.id)"
                 class="clickable-row"
               >
-                <td>{{ chamado.atualizado }}</td>
+                <td>{{ chamado.update_date  }}</td>
                 <td>{{ chamado.id }}</td>
-                <td>{{ chamado.titulo }}</td>
+                <td>{{ chamado.title }}</td>
                 <td>
                   <div class="tecnico-info">
                     <p>{{ chamado.tecnico }}</p>
-                    <p class="tecnico-email">{{ chamado.email || chamado.tecnico.toLowerCase() + '@email.com' }}</p>
+                   <p class="tecnico-email">
+  {{ chamado.email || (chamado.tecnico ? chamado.tecnico.toLowerCase() + '@email.com' : 'sem-técnico') }}
+</p>
+
                   </div>
                 </td>
                 <td>
@@ -96,94 +99,118 @@
 import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
-
-// Importando a instância personalizada do axios
-import api from "@/services/api";  
-
+import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api' // axios configurado
 
 interface Chamado {
   id: number
-  atualizado: string
-  titulo: string
-  tecnico: string
-  email?: string
+  title: string
   status: string
   prioridade: string
+  update_date: string
+  tecnico?: string
+  email?: string
 }
 
 export default defineComponent({
   name: 'MeusChamados',
-  components: {
-    ClienteSidebar
-  },
+  components: { ClienteSidebar },
+
   setup() {
     const router = useRouter()
+    const auth = useAuthStore()
+
+    // 🔽 Filtros
     const filtroStatus = ref('todos')
     const filtroPrioridade = ref('todos')
     const ordemExibicao = ref('recente')
     const pesquisa = ref('')
 
     const usuario = ref({
-      nome: 'Lucas Santino',
-      email: 'lucas@email.com'
+      nome: auth.user?.name || 'Usuário',
+      email: auth.user?.email || 'sem@email.com'
     })
 
     const chamados = ref<Chamado[]>([])
 
-    // Função para carregar os chamados
+    // ✅ Função para carregar os chamados do usuário logado
     const carregarChamados = async () => {
       try {
-        const response = await api.get('chamados/')  // Usando a instância do axios com token JWT
-        chamados.value = response.data
-      } catch (error) {
-        console.error('Erro ao carregar chamados:', error)
+        const token = auth.access
+        if (!token) {
+          console.warn("⚠️ Nenhum token encontrado. Redirecionando para login...")
+          router.push('/')
+          return
+        }
+
+        const response = await api.get('chamados/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        console.log("📦 Dados recebidos:", response.data)
+
+        chamados.value = (response.data.results || response.data).filter(
+  (c: any) => c.creator === auth.user?.id
+)
+
+
+        // Se o backend retorna uma lista simples
+        chamados.value = response.data.results || response.data
+        console.log("✅ Chamados carregados:", chamados.value)
+      } catch (error: any) {
+        console.error("❌ Erro ao carregar chamados:", error.response?.data || error)
+        if (error.response?.status === 401) {
+          alert("Sessão expirada. Faça login novamente.")
+          router.push('/')
+        }
       }
     }
 
+    // ✅ Executa ao carregar a página
     onMounted(() => {
       carregarChamados()
     })
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada no clique da página para fechar o menu de perfil
-    }
+    const closeProfileMenu = () => {}
 
     const goToChamadoDetalhado = (id: number) => {
       router.push({ path: '/cliente/chamado-detalhado', query: { id: id.toString() } })
     }
 
+    // ✅ Filtros dinâmicos
     const filtrados = computed(() => {
       return chamados.value.filter((c) => {
-        const matchStatus = filtroStatus.value === 'todos' || c.status.toLowerCase() === filtroStatus.value.toLowerCase()
-        const matchPrioridade = filtroPrioridade.value === 'todos' || c.prioridade.toLowerCase() === filtroPrioridade.value.toLowerCase()
+        const matchStatus =
+          filtroStatus.value === 'todos' || c.status?.toLowerCase() === filtroStatus.value.toLowerCase()
+        const matchPrioridade =
+          filtroPrioridade.value === 'todos' || c.prioridade?.toLowerCase() === filtroPrioridade.value.toLowerCase()
         const matchPesquisa =
-          c.titulo.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
-          c.tecnico.toLowerCase().includes(pesquisa.value.toLowerCase())
+          c.title?.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
+          c.tecnico?.toLowerCase().includes(pesquisa.value.toLowerCase())
         return matchStatus && matchPrioridade && matchPesquisa
       })
     })
 
+    // ✅ Ordenação (recente/antigo)
     const chamadosOrdenados = computed(() => {
-      const chamadosFiltrados = [...filtrados.value]
-
+      const lista = [...filtrados.value]
       if (ordemExibicao.value === 'recente') {
-        return chamadosFiltrados.sort((a, b) => {
-          return new Date(b.atualizado.split(' ')[0].split('/').reverse().join('-')).getTime() - 
-                 new Date(a.atualizado.split(' ')[0].split('/').reverse().join('-')).getTime()
-        })
+        return lista.sort((a, b) =>
+          new Date(b.update_date).getTime() - new Date(a.update_date).getTime()
+        )
       } else {
-        return chamadosFiltrados.sort((a, b) => {
-          return new Date(a.atualizado.split(' ')[0].split('/').reverse().join('-')).getTime() - 
-                 new Date(b.atualizado.split(' ')[0].split('/').reverse().join('-')).getTime()
-        })
+        return lista.sort((a, b) =>
+          new Date(a.update_date).getTime() - new Date(b.update_date).getTime()
+        )
       }
     })
 
+    // ✅ Classes e ícones
     const statusClass = (status: string) => {
       switch (status.toLowerCase()) {
         case 'concluído': return 'status-concluido'
         case 'aberto': return 'status-aberto'
-        case 'aguardando': return 'status-aguardando'
+        case 'aguardando_atendimento': return 'status-aguardando'
         case 'em andamento': return 'status-andamento'
         case 'cancelado': return 'status-cancelado'
         default: return ''
@@ -194,10 +221,10 @@ export default defineComponent({
       switch (status.toLowerCase()) {
         case 'concluído': return 'check_circle'
         case 'aberto': return 'circle'
-        case 'aguardando': return 'hourglass_top'
+        case 'aguardando_atendimento': return 'hourglass_top'
         case 'em andamento': return 'autorenew'
         case 'cancelado': return 'cancel'
-        default: return ''
+        default: return 'help_outline'
       }
     }
 
@@ -249,6 +276,7 @@ export default defineComponent({
   }
 })
 </script>
+
 
 
 <style scoped>

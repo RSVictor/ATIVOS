@@ -95,9 +95,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
+import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
+import api from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 
 export default defineComponent({
   name: 'ChamadoDetalhado',
@@ -106,10 +108,11 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter()
+      const auth = useAuthStore()
 
     const usuario = ref({
-      nome: 'Lucas Santino',
-      email: 'lucas@email.com'
+      nome: auth.user?.name || 'Usuário',
+      email: auth.user?.email || 'sem@email.com'
     })
 
     const closeProfileMenu = () => {
