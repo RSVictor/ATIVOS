@@ -108,7 +108,10 @@
 
             <div class="summary-section">
               <p class="summary-label">Imagem</p>
-              <p class="summary-value">Nenhuma imagem selecionada</p>
+              <p class="summary-value">
+                <img v-if="imagemURL" :src="imagemURL" alt="Imagem anexada" style="max-width: 100px; max-height: 100px;">
+                <span v-else>Nenhuma imagem selecionada</span>
+              </p>
             </div>
 
             <div class="create-btn-container">
@@ -133,7 +136,7 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter()
-    
+
     const titulo = ref('')
     const descricao = ref('')
     const categoria = ref('')
@@ -146,7 +149,7 @@ export default defineComponent({
       { value: 'baixa', label: 'Baixa' }
     ])
     const maxDescricaoChars = 2830
-    
+
     // Dados do usuário - você pode obter isso de um store ou API
     const userName = ref('Lucas Santino')
     const userEmail = ref('lucas@email.com')
@@ -164,6 +167,12 @@ export default defineComponent({
     }
 
     const submitChamado = () => {
+      // Validação de campos obrigatórios
+      if (!titulo.value || !descricao.value || !categoria.value || !prioridade.value) {
+        alert("Por favor, preencha todos os campos obrigatórios!");
+        return;
+      }
+
       console.log({
         titulo: titulo.value,
         descricao: descricao.value,
@@ -171,23 +180,27 @@ export default defineComponent({
         prioridade: prioridade.value,
         imagemURL: imagemURL.value,
       })
-      alert('Chamado enviado com sucesso!')
+      alert("Chamado enviado com sucesso!")
+
       // Limpar formulário
       titulo.value = ''
       descricao.value = ''
       categoria.value = ''
       prioridade.value = ''
       imagemURL.value = null
+
       // Redirecionar para meus chamados
-      router.push('/cliente/meus-chamados')
+      router.push("/cliente/meus-chamados")
     }
 
     const onFileChange = (event: Event) => {
       const target = event.target as HTMLInputElement
       if (target.files && target.files[0]) {
         imagemURL.value = URL.createObjectURL(target.files[0])
+        document.querySelector('.file-text')!.textContent = target.files[0].name
       } else {
         imagemURL.value = null
+        document.querySelector('.file-text')!.textContent = 'Nenhum arquivo escolhido'
       }
     }
 
@@ -246,6 +259,7 @@ export default defineComponent({
 /* Mantenha todos os estilos CSS existentes da página novoChamado.vue */
 /* Apenas remova os estilos relacionados à sidebar que agora estão no componente separado */
 
+/* RESET COMPLETO E FULLSCREEN */
 /* RESET COMPLETO E FULLSCREEN */
 * {
   margin: 0;

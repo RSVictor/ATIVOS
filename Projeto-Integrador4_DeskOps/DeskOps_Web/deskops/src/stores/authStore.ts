@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import router from '../router'
-import api from '../services/api' // seu axios configurado
+import api from '../services/api' 
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -29,7 +29,8 @@ export const useAuthStore = defineStore('auth', {
         localStorage.setItem('user', JSON.stringify(user));
 
         // redirecionamento dinâmico
-        if (user.cargo === 'admin') router.push('/adm/dashboard');
+        console.log(JSON.parse(JSON.stringify(user.cargo)))
+        if (user.cargo === 'ADM') router.push('/adm/dashboard');
         else if (user.cargo === 'tecnico') router.push('/tecnico/chamados-lista');
         else router.push('/cliente/meus-chamados');
       } catch (error: any) {

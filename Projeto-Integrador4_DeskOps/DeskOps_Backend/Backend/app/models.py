@@ -65,8 +65,7 @@ class Ativo(models.Model):
         choices=status_ativos.choices,
         default=status_ativos.ATIVO,
     )
-    environment_FK = models.ForeignKey(Environment, related_name='ativo_ambiente_FK', on_delete=models.CASCADE)
-    qr_code = models.CharField(max_length=250, null=True, blank=True)
+    environment_FK = models.ForeignKey(Environment, related_name='ativo_ambiente_FK', on_delete=models.CASCADE)   
 
     def __str__(self):
         return self.name

@@ -8,7 +8,9 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework import viewsets
 
+from .permissions import ChamadoPermission
 from .models import Users, Environment, Ativo, Chamado, Notificate
 from .permissions import ChamadoPermission
 from .serializers import (
@@ -133,9 +135,8 @@ class AtivoView(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
-class ChamadoView(ReadWriteSerializer, ModelViewSet):
+class ChamadoViewSet(viewsets.ModelViewSet):
     queryset = Chamado.objects.all()
-    read_serializer_class = None
     serializer_class = ChamadoSerializer
     permission_classes = [IsAuthenticated, ChamadoPermission]
 

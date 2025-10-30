@@ -1,17 +1,24 @@
 import axios from "axios";
 
-// URL base do backend Django
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
+  baseURL: "http://127.0.0.1:8000/api/",  // Sua URL base
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-// Interceptor: adiciona automaticamente o token JWT
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Interceptor de requisição
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");  // Obtém o access token do localStorage
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;  // Adiciona o token no cabeçalho Authorization
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 export default api;

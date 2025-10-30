@@ -41,16 +41,16 @@ const routes: Array<RouteRecordRaw> = [
   { path: '/cadastro', name: 'Cadastro', component: Cadastro, meta: { public: true } },
 
   // Admin Routes
-  { path: '/adm/perfil', name: 'AdmPerfil', component: AdmPerfil, meta: { role: 'admin' } },
-  { path: '/adm/dashboard', name: 'Dashboard', component: Dashboard, meta: { role: 'admin' } },
-  { path: '/adm/gestao-ambiente', name: 'GestaoAmbiente', component: GestaoAmbiente, meta: { role: 'admin' } },
-  { path: '/adm/gestao-chamado', name: 'GestaoChamado', component: GestaoChamado, meta: { role: 'admin' } },
-  { path: '/adm/gestao-usuarios', name: 'GestaoUsuarios', component: GestaoUsuarios, meta: { role: 'admin' } },
-  { path: '/adm/novo-ambiente', name: 'NovoAmbiente', component: NovoAmbiente, meta: { role: 'admin' } },
-  { path: '/adm/gestao-ativos', name: 'GestaoAtivos', component: GestaoAtivos, meta: { role: 'admin' } },
-  { path: '/adm/novo-ativo', name: 'NovoAtivo', component: NovoAtivo, meta: { role: 'admin' } },
-  { path: '/adm/detalhes-ativos', name: 'DetalhesAtivos', component: DetalhesAtivos, meta: { role: 'admin' } },
-  { path: '/adm/detalhes-ambiente', name: 'DetalhesAmbiente', component: DetalhesAmbiente, meta: { role: 'admin' } },
+  { path: '/adm/perfil', name: 'AdmPerfil', component: AdmPerfil, meta: { role: 'ADM' } },
+  { path: '/adm/dashboard', name: 'Dashboard', component: Dashboard, meta: { role: 'ADM' } },
+  { path: '/adm/gestao-ambiente', name: 'GestaoAmbiente', component: GestaoAmbiente, meta: { role: 'ADM' } },
+  { path: '/adm/gestao-chamado', name: 'GestaoChamado', component: GestaoChamado, meta: { role: 'ADM' } },
+  { path: '/adm/gestao-usuarios', name: 'GestaoUsuarios', component: GestaoUsuarios, meta: { role: 'ADM' } },
+  { path: '/adm/novo-ambiente', name: 'NovoAmbiente', component: NovoAmbiente, meta: { role: 'ADM' } },
+  { path: '/adm/gestao-ativos', name: 'GestaoAtivos', component: GestaoAtivos, meta: { role: 'ADM' } },
+  { path: '/adm/novo-ativo', name: 'NovoAtivo', component: NovoAtivo, meta: { role: 'ADM' } },
+  { path: '/adm/detalhes-ativos', name: 'DetalhesAtivos', component: DetalhesAtivos, meta: { role: 'ADM' } },
+  { path: '/adm/detalhes-ambiente', name: 'DetalhesAmbiente', component: DetalhesAmbiente, meta: { role: 'ADM' } },
 
   // Cliente Routes
   { path: '/cliente/chamado-detalhado', name: 'ChamadoDetalhado', component: ChamadoDetalhado, meta: { role: 'usuario' } },
