@@ -173,9 +173,10 @@ export default defineComponent({
 
     const closeProfileMenu = () => {}
 
-    const goToChamadoDetalhado = (id: number) => {
-      router.push({ path: '/cliente/chamado-detalhado', query: { id: id.toString() } })
-    }
+   const goToChamadoDetalhado = (id: number) => {
+  router.push({ name: 'ChamadoDetalhado', params: { id } })
+}
+
 
     // ✅ Filtros dinâmicos
     const filtrados = computed(() => {

@@ -53,8 +53,8 @@ const routes: Array<RouteRecordRaw> = [
   { path: '/adm/detalhes-ambiente', name: 'DetalhesAmbiente', component: DetalhesAmbiente, meta: { role: 'ADM' } },
 
   // Cliente Routes
-  { path: '/cliente/chamado-detalhado', name: 'ChamadoDetalhado', component: ChamadoDetalhado, meta: { role: 'usuario' } },
-  { path: '/cliente/editar-chamado', name: 'EditarChamado', component: EditarChamado, meta: { role: 'usuario' } },
+  { path: '/cliente/chamado/:id', name: 'ChamadoDetalhado', component: ChamadoDetalhado, meta: { role: 'usuario' }, props: true, },
+  {  path: '/cliente/editar-chamado/:id', name: 'EditarChamado',component: EditarChamado,  meta: { role: 'usuario' },props: true},
   { path: '/cliente/meus-chamados', name: 'MeusChamados', component: MeusChamados, meta: { role: 'usuario' } },
   { path: '/cliente/novo-chamado', name: 'NovoChamado', component: NovoChamado, meta: { role: 'usuario' } },
   { path: '/cliente/perfil', name: 'PerfilCliente', component: PerfilCliente, meta: { role: 'usuario' } },

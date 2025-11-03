@@ -124,8 +124,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { defineComponent, ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
@@ -137,53 +137,101 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter()
-      const auth = useAuthStore()
-    
-    // Dados simulados do chamado existente
-    const titulo = ref('Erro ao acessar o painel administrativo')
-    const descricao = ref(
-      'Usuário relata que ao tentar acessar o painel, uma tela de erro 500 é exibida. Foi realizado teste em diferentes navegadores e o problema persiste.'
-    )
-    const categoria = ref('Suporte')
-    const prioridade = ref('media') // Valor padrão para prioridade
-    const imagemURL = ref<string | null>(null)
+    const route = useRoute()
+    const auth = useAuthStore()
 
+    // ✅ Usuário logado
     const usuario = ref({
       nome: auth.user?.name || 'Usuário',
       email: auth.user?.email || 'sem@email.com'
     })
 
+    // ✅ Campos do chamado
+    const titulo = ref('')
+    const descricao = ref('')
+    const categoria = ref('')
+    const prioridade = ref('')
+    const imagemURL = ref<string | null>(null)
+    const imagem = ref<File | null>(null)
 
+    // ✅ Opções de categoria e prioridade
     const categorias = ref(['Manutenção', 'Suporte', 'Instalação', 'Rede', 'Software', 'Hardware'])
     const prioridades = ref([
       { value: 'alta', label: 'Alta' },
       { value: 'media', label: 'Média' },
-      { value: 'baixa', label: 'Baixa' }
+      { value: 'baixa', label: 'Baixa' },
     ])
     const maxDescricaoChars = 2830
 
-    const salvarChamado = () => {
-      console.log({
-        titulo: titulo.value,
-        descricao: descricao.value,
-        categoria: categoria.value,
-        prioridade: prioridade.value,
-        imagemURL: imagemURL.value,
-      })
-      alert('Chamado atualizado com sucesso!')
-      router.push('/cliente/chamado-detalhado')
+    // ✅ Carrega dados do chamado existente ao abrir a página
+    const carregarChamado = async () => {
+      try {
+        const id = route.params.id
+        const token = auth.access
+
+        const response = await api.get(`/chamados/${id}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        const data = response.data
+        titulo.value = data.title
+        descricao.value = data.description
+        categoria.value = data.environment || ''
+        prioridade.value = data.prioridade?.toLowerCase() || ''
+        imagemURL.value = data.photo || null
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar chamado:', error.response?.data || error)
+        alert('Erro ao carregar informações do chamado.')
+      }
     }
+
+    onMounted(() => carregarChamado())
+
+    // ✅ Atualiza o chamado
+   const salvarChamado = async () => {
+  try {
+    const id = route.params.id
+    const token = auth.access
+
+    const formData = new FormData()
+    formData.append('title', titulo.value)
+    formData.append('description', descricao.value)
+    formData.append('prioridade', prioridade.value.toUpperCase())
+
+    // 🔹 Aqui: verifique se categoria é ID ou nome
+    if (!isNaN(Number(categoria.value))) {
+      formData.append('environment', categoria.value)
+    }
+
+    if (imagem.value) {
+      formData.append('photo', imagem.value)
+    }
+
+    const response = await api.patch(`/chamados/${id}/`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    console.log('✅ Chamado atualizado:', response.data)
+    alert('Chamado atualizado com sucesso!')
+    router.push(`/cliente/chamado/${id}`)
+  } catch (error: any) {
+    console.error('❌ Erro ao atualizar chamado:', error.response?.data || error)
+    alert(`Erro ao salvar alterações: ${JSON.stringify(error.response?.data || error)}`)
+  }
+}
 
     const onFileChange = (event: Event) => {
       const target = event.target as HTMLInputElement
       if (target.files && target.files[0]) {
+        imagem.value = target.files[0]
         imagemURL.value = URL.createObjectURL(target.files[0])
-      } else {
-        imagemURL.value = null
       }
     }
 
-    // Funções para prioridade
+    // ✅ Funções auxiliares para prioridade
     const prioridadeClass = (prioridade: string) => {
       switch (prioridade.toLowerCase()) {
         case 'alta': return 'prioridade-alta'
@@ -230,6 +278,7 @@ export default defineComponent({
   },
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

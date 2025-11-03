@@ -179,22 +179,25 @@ export default defineComponent({
           return
         }
 
-        const response = await api.get('/me/', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+         
+    const response = await api.get('/me/', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
 
-        // ✅ Mapeia os campos retornados pelo seu endpoint
         usuario.value = {
-          nome: response.data.name,
-          email: response.data.email,
-          cargo: response.data.cargo || 'Não informado',
-          cpf: response.data.cpf || '---',
-          ativo: response.data.is_active ? 'Ativo' : 'Inativo',
-          tipoUsuario: response.data.is_staff ? 'Administrador' : 'Cliente',
-          foto: '',
-        }
+        nome: response.data.name,
+        email: response.data.email,
+        cargo: response.data.cargo || 'Não informado',
+        cpf: response.data.cpf || '---',
+        dataNascimento: response.data.dt_nascimento || '---',
+        endereco: response.data.endereco || '---',
+        ativo: response.data.is_active ? 'Ativo' : 'Inativo',
+        tipoUsuario: response.data.is_staff ? 'Administrador' : 'Cliente',
+        foto: response.data.foto_user || '',
+}
+
 
         usuarioEditado.value = { ...usuario.value }
         console.log('👤 Dados do usuário carregados:', usuario.value)
@@ -223,15 +226,48 @@ export default defineComponent({
       editMode.value = false
     }
 
-    const saveChanges = async () => {
-      try {
-        usuario.value = { ...usuarioEditado.value }
-        editMode.value = false
-        alert('Alterações salvas com sucesso! (local)')
-      } catch (error) {
-        console.error('❌ Erro ao salvar alterações:', error)
-      }
+   const saveChanges = async () => {
+  try {
+    const token = auth.access
+    if (!token) {
+      alert('Sessão expirada. Faça login novamente.')
+      router.push('/')
+      return
     }
+
+    // Monta os dados que o backend espera
+    const payload = {
+      name: usuarioEditado.value.nome,
+      email: usuarioEditado.value.email,
+      cpf: usuarioEditado.value.cpf,
+      cargo: usuarioEditado.value.cargo,
+      dt_nascimento: usuarioEditado.value.dataNascimento,
+      endereco: usuarioEditado.value.endereco,
+    }
+
+    // Faz o PUT/PATCH na API
+    const response = await api.patch('me/', payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    usuario.value = {
+      ...usuario.value,
+      nome: response.data.name,
+      email: response.data.email,
+      cpf: response.data.cpf,
+      cargo: response.data.cargo,
+      dataNascimento: response.data.dt_nascimento,
+      endereco: response.data.endereco,
+    }
+
+    editMode.value = false
+    alert('✅ Alterações salvas com sucesso!')
+  } catch (error) {
+    console.error('❌ Erro ao salvar alterações:', error.response?.data || error)
+    alert('Erro ao salvar alterações. Verifique os campos e tente novamente.')
+  }
+}
+
 
     const changePhoto = () => {
       const input = document.createElement('input')

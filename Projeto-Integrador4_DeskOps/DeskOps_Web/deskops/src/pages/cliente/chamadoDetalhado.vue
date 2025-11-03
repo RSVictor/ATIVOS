@@ -15,13 +15,18 @@
         <!-- Título com botão Editar -->
         <div class="title-edit-container">
           <h1 class="page-title">Chamado Detalhado</h1>
-          <button class="btn-editar" @click="$router.push('/cliente/editar-chamado')">
+          <button
+            class="btn-editar"
+            v-if="chamado"
+            @click="$router.push(`/cliente/editar-chamado/${chamado.id}`)"
+          >
             <span class="material-icons">edit</span>
             Editar
           </button>
         </div>
 
-        <div class="cards-container">
+        <!-- Mostrar conteúdo apenas quando o chamado for carregado -->
+        <div v-if="chamado" class="cards-container">
           <!-- Card do chamado -->
           <div class="card-form">
             <div class="header-info">
@@ -41,14 +46,15 @@
 
             <div class="info-section">
               <h3>Ambiente</h3>
-              <p class="info-text">{{ chamado.Ambiente }}</p>
+              <p class="info-text">{{ chamado.ambiente || '---' }}</p>
             </div>
 
-            <!-- Campo de Prioridade Adicionado -->
             <div class="info-section">
               <h3>Prioridade</h3>
               <span :class="['prioridade-badge', prioridadeClass(chamado.prioridade)]">
-                <span class="material-icons prioridade-icon">{{ prioridadeIcon(chamado.prioridade) }}</span>
+                <span class="material-icons prioridade-icon">
+                  {{ prioridadeIcon(chamado.prioridade) }}
+                </span>
                 {{ formatarPrioridade(chamado.prioridade) }}
               </span>
             </div>
@@ -82,61 +88,97 @@
           <!-- Card do técnico -->
           <div class="card-summary">
             <h2 class="card-title">Técnico Responsável</h2>
-            <p class="summary-item">Nome<br /><span class="summary-text tecnico-text">{{ tecnico.nome }}</span></p>
-            <p class="summary-item">E-mail<br /><span class="summary-text tecnico-text">{{ tecnico.email }}</span></p>
+            <p class="summary-item">
+              Nome<br />
+              <span class="summary-text tecnico-text">{{ tecnico?.name || '---' }}</span>
+            </p>
+            <p class="summary-item">
+              E-mail<br />
+              <span class="summary-text tecnico-text">{{ tecnico?.email || '---' }}</span>
+            </p>
 
             <!-- Botão Encerrar Chamado -->
             <button class="btn-encerrar" @click="encerrarChamado">Encerrar Chamado</button>
           </div>
+        </div>
+
+        <!-- Exibir enquanto o chamado carrega -->
+        <div v-else class="loading-container">
+          <p>🔄 Carregando detalhes do chamado...</p>
         </div>
       </div>
     </main>
   </div>
 </template>
 
+
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { defineComponent, ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 
 export default defineComponent({
   name: 'ChamadoDetalhado',
-  components: {
-    ClienteSidebar
-  },
+  components: { ClienteSidebar },
+
   setup() {
     const router = useRouter()
-      const auth = useAuthStore()
+    const route = useRoute()
+    const auth = useAuthStore()
 
     const usuario = ref({
       nome: auth.user?.name || 'Usuário',
       email: auth.user?.email || 'sem@email.com'
     })
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada no clique da página para fechar o menu de perfil
+    const chamado = ref<any>(null)
+    const tecnico = ref<any>(null)
+
+    // Função para buscar o chamado
+    const carregarChamado = async () => {
+      try {
+        const id = route.params.id
+        const token = auth.access
+
+        const response = await api.get(`/chamados/${id}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        const data = response.data
+        chamado.value = {
+          id: data.id,
+          titulo: data.title,
+          descricao: data.description,
+          ambiente: data.environment || '---',
+          imagem: data.photo || null,
+          status: data.status,
+          prioridade: data.prioridade,
+          criadoEm: new Date(data.dt_criacao).toLocaleString('pt-BR'),
+          atualizadoEm: new Date(data.update_date).toLocaleString('pt-BR'),
+          criadoPor: {
+            nome: data.creator?.name || '---',
+            email: data.creator?.email || '---',
+          },
+        }
+
+        // Exemplo de técnico (caso o campo employee venha do backend)
+        if (data.employee && data.employee.length > 0) {
+          tecnico.value = {
+            nome: data.employee[0]?.name || '---',
+            email: data.employee[0]?.email || '---',
+          }
+        } else {
+          tecnico.value = { name: 'Não atribuído', email: 'Não atribuído' }
+        }
+
+        console.log('📋 Chamado carregado:', chamado.value)
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar chamado:', error.response?.data || error)
+        alert('Erro ao carregar detalhes do chamado.')
+      }
     }
-
-    const chamado = ref({
-      id: 1024,
-      titulo: 'Erro ao acessar o painel administrativo',
-      descricao:
-        'Usuário relata que ao tentar acessar o painel, uma tela de erro 500 é exibida. Foi realizado teste em diferentes navegadores e o problema persiste.',
-      Ambiente: 'Departamento Adiministrativo',
-      imagem: '', 
-      status: 'Em Andamento',
-      prioridade: 'Alta', // Campo de prioridade adicionado
-      criadoEm: '10/10/2025 - 14:22',
-      atualizadoEm: '11/10/2025 - 09:10',
-      criadoPor: { nome: 'Lucas Santino', email: 'lucas@email.com' },
-    })
-
-    const tecnico = ref({
-      nome: 'Carlos Almeida',
-      email: 'carlos.almeida@deskops.com',
-    })
 
     const statusClass = (status: string) => {
       const s = status.toLowerCase()
@@ -158,9 +200,8 @@ export default defineComponent({
       return 'info'
     }
 
-    // Funções para prioridade (adicionadas do código do técnico)
-    const prioridadeClass = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
+    const prioridadeClass = (p: string) => {
+      switch (p?.toLowerCase()) {
         case 'alta': return 'prioridade-alta'
         case 'media': return 'prioridade-media'
         case 'baixa': return 'prioridade-baixa'
@@ -168,8 +209,8 @@ export default defineComponent({
       }
     }
 
-    const prioridadeIcon = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
+    const prioridadeIcon = (p: string) => {
+      switch (p?.toLowerCase()) {
         case 'alta': return 'arrow_upward'
         case 'media': return 'remove'
         case 'baixa': return 'arrow_downward'
@@ -177,34 +218,47 @@ export default defineComponent({
       }
     }
 
-    const formatarPrioridade = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
+    const formatarPrioridade = (p: string) => {
+      switch (p?.toLowerCase()) {
         case 'alta': return 'Alta'
         case 'media': return 'Média'
         case 'baixa': return 'Baixa'
-        default: return prioridade
+        default: return p
       }
     }
 
-    const encerrarChamado = () => {
-      alert('Chamado encerrado com sucesso!')
+    const encerrarChamado = async () => {
+      try {
+        const id = route.params.id
+        await api.patch(`/chamados/${id}/encerrar/`, {}, {
+          headers: { Authorization: `Bearer ${auth.access}` },
+        })
+        alert('Chamado encerrado com sucesso!')
+        router.push('/cliente/meus-chamados')
+      } catch (error) {
+        alert('Erro ao encerrar chamado.')
+      }
     }
 
-    return { 
+    onMounted(() => {
+      carregarChamado()
+    })
+
+    return {
       usuario,
-      chamado, 
-      tecnico, 
-      closeProfileMenu,
-      statusClass, 
-      statusIcon, 
+      chamado,
+      tecnico,
+      statusClass,
+      statusIcon,
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
-      encerrarChamado 
+      encerrarChamado,
     }
   },
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

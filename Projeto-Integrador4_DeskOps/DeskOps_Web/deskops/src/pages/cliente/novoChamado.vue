@@ -150,35 +150,45 @@ export default defineComponent({
 
     const closeProfileMenu = () => {}
 
-    const submitChamado = async () => {
-      if (!titulo.value || !descricao.value || !categoria.value || !prioridade.value) {
-        alert("Por favor, preencha todos os campos obrigatórios!")
-        return
-      }
-
-      try {
-                const payload = {
-          title: titulo.value,
-          description: descricao.value,
-          prioridade: prioridade.value.toUpperCase(),
-          status: "AGUARDANDO_ATENDIMENTO",
-          photo: "",
-          asset: 1,
-          employee: [],
-        };
-
-        console.log("📤 Enviando chamado:", payload)
-
-        const response = await api.post('/chamados/', payload) // ✅ rota correta
-        console.log("✅ Chamado criado:", response.data)
-
-        alert("Chamado criado com sucesso!")
-        router.push("/cliente/meus-chamados")
-      } catch (error: any) {
-        console.error("❌ Erro ao criar chamado:", error.response?.data || error)
-        alert("Erro ao criar chamado. Verifique se está logado e tente novamente.")
-      }
+      const submitChamado = async () => {
+    if (!titulo.value || !descricao.value || !categoria.value || !prioridade.value) {
+      alert("Por favor, preencha todos os campos obrigatórios!");
+      return;
     }
+
+    try {
+      const formData = new FormData();
+      formData.append("title", titulo.value);
+      formData.append("description", descricao.value);
+      formData.append("prioridade", prioridade.value.toUpperCase());
+      formData.append("status", "AGUARDANDO_ATENDIMENTO");
+      formData.append("asset", "1"); // ⚠️ substitua pelo ID real do ativo se for dinâmico
+     
+
+      // 🔹 Adiciona a imagem se houver
+      const fileInput = document.querySelector(".file-input");
+      if (fileInput && fileInput.files.length > 0) {
+        formData.append("photo", fileInput.files[0]);
+      }
+
+      // 🔹 Envia o FormData com o token JWT
+      const response = await api.post("/chamados/", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      console.log("✅ Chamado criado:", response.data);
+      alert("Chamado criado com sucesso!");
+      router.push("/cliente/meus-chamados");
+    } catch (error) {
+      console.error("❌ Erro ao criar chamado:", JSON.stringify(error.response?.data, null, 2));
+
+      alert("Erro ao criar chamado. Verifique os campos e tente novamente.");
+    }
+  };
+
 
     const onFileChange = (event: Event) => {
       const target = event.target as HTMLInputElement
