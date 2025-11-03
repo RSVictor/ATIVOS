@@ -254,7 +254,6 @@ export default defineComponent({
 /* Apenas remova os estilos relacionados à sidebar que agora estão no componente separado */
 
 /* RESET COMPLETO E FULLSCREEN */
-/* RESET COMPLETO E FULLSCREEN */
 * {
   margin: 0;
   padding: 0;
