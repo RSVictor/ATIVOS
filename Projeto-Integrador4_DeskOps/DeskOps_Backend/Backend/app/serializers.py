@@ -1,6 +1,7 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 from .models import Users, Environment, Ativo, Chamado, Notificate 
+from rest_framework import generics
 
 
 class ReadWriteSerializer(object):
@@ -22,7 +23,7 @@ class ReadWriteSerializer(object):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = Users
-        fields = ['id', 'name', 'email', 'cargo', 'cpf', 'dt_nascimento', 'endereco', 'foto_user', 'is_active', 'is_staff', 'role']
+        fields = ['id', 'name', 'email', 'cargo', 'cpf', 'dt_nascimento', 'endereco', 'foto_user', 'is_active', 'is_staff',  'created_at','role']
         read_only_fields = ['is_active', 'is_staff', 'role']
 
 
@@ -100,7 +101,6 @@ class ChamadoSerializer(serializers.ModelSerializer):
         if request and hasattr(request, 'user'):
             validated_data['creator'] = request.user
         return super().create(validated_data)
-
 
 
 class NotificateSerializer(serializers.ModelSerializer):

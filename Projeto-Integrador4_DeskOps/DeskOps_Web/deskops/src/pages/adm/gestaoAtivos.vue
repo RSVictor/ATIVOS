@@ -1,7 +1,7 @@
 <template>
   <div class="gestao-ativos-page" @click="closeProfileMenu">
     <!-- Sidebar do Admin -->
-    <adm-sidebar :usuario="usuario" />
+    <adm-sidebar />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -177,10 +177,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { defineComponent, ref, reactive, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
-import QrcodeVue from 'qrcode.vue'
+import api from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 
 interface Ambiente {
   id: number
@@ -195,229 +196,188 @@ interface Ativo {
   ambiente: Ambiente
   status: string
   qrCode: string
+  criadoEm: string
+  atualizadoEm: string
 }
 
 export default defineComponent({
-  name: 'GestaoAtivos',
-  components: {
-    AdmSidebar,
-    QrcodeVue
-  },
-  setup() {
-    const router = useRouter()
-    const filtroStatus = ref('todos')
-    const filtroAmbiente = ref('todos')
-    const ordemExibicao = ref('recente')
-    const pesquisa = ref('')
-    const modalAberto = ref(false)
-    const ativoSelecionado = ref<Ativo | null>(null)
+  name: 'DetalhesAtivos',
+  components: { AdmSidebar },
 
+  setup() {
+    const route = useRoute()
+    const router = useRouter()
+    const auth = useAuthStore()
+    const token = auth.access
+    const ativoId = Number(route.params.id)
+
+    const editando = ref(false)
+    const carregando = ref(true)
+    const ativo = ref<Ativo | null>(null)
+
+    const formEdit = reactive({
+      nome: '',
+      descricao: '',
+      ambiente: {
+        id: 0,
+        nome: '',
+        localizacao: ''
+      },
+      status: ''
+    })
+
+    // 🔹 Usuário logado
     const usuario = ref({
       nome: 'Administrador',
       email: 'admin@deskops.com',
-      dataNascimento: '10/05/1980',
-      cpf: '111.222.333-44',
-      endereco: 'Av. Principal, 1000, São Paulo, SP',
       tipoUsuario: 'Administrador',
-      foto: '', 
+      foto: '',
     })
 
-    const ambientes = ref<Ambiente[]>([
-      { id: 1, nome: 'Sala de Reuniões - Matriz', localizacao: 'Andar 1' },
-      { id: 2, nome: 'Laboratório de TI', localizacao: 'Andar 2' },
-      { id: 3, nome: 'Data Center', localizacao: 'Andar Térreo' },
-      { id: 4, nome: 'Escritório - Andar 3', localizacao: 'Andar 3' },
-      { id: 5, nome: 'Sala de Treinamento', localizacao: 'Andar 2' },
-    ])
+    // 🔹 Buscar ativo da API
+    const carregarAtivo = async () => {
+      try {
+        const response = await api.get(`/ativo/${ativoId}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-    const ativos = ref<Ativo[]>([
-      { 
-        id: 3001, 
-        nome: 'Notebook Dell Latitude 5420', 
-        descricao: 'Notebook corporativo para desenvolvimento',
-        ambiente: ambientes.value[1],
-        status: 'ativo',
-        qrCode: 'QR001'
-      },
-      { 
-        id: 3002, 
-        nome: 'Projetor Epson PowerLite', 
-        descricao: 'Projetor para apresentações e reuniões',
-        ambiente: ambientes.value[0],
-        status: 'ativo',
-        qrCode: 'QR002'
-      },
-      { 
-        id: 3003, 
-        nome: 'Servidor HP ProLiant', 
-        descricao: 'Servidor principal do data center',
-        ambiente: ambientes.value[2],
-        status: 'manutencao',
-        qrCode: 'QR003'
-      },
-      { 
-        id: 3004, 
-        nome: 'Switch Cisco Catalyst', 
-        descricao: 'Switch de rede 48 portas',
-        ambiente: ambientes.value[2],
-        status: 'ativo',
-        qrCode: 'QR004'
-      },
-      { 
-        id: 3005, 
-        nome: 'Impressora Multifuncional', 
-        descricao: 'Impressora laser colorida A3',
-        ambiente: ambientes.value[3],
-        status: 'manutencao',
-        qrCode: 'QR005'
-      },
-      { 
-        id: 3006, 
-        nome: 'Tablet Samsung Galaxy Tab', 
-        descricao: 'Tablet para demonstrações',
-        ambiente: ambientes.value[4],
-        status: 'ativo',
-        qrCode: 'QR006'
-      },
-      { 
-        id: 3007, 
-        nome: 'Monitor LG UltraWide', 
-        descricao: 'Monitor 34 polegadas para design',
-        ambiente: ambientes.value[1],
-        status: 'ativo',
-        qrCode: 'QR007'
-      },
-      { 
-        id: 3008, 
-        nome: 'Access Point Ubiquiti', 
-        descricao: 'Access point para cobertura Wi-Fi',
-        ambiente: ambientes.value[3],
-        status: 'ativo',
-        qrCode: 'QR008'
-      },
-    ])
+        console.log('✅ Dados recebidos do ativo:', response.data)
+        const a = response.data
 
-    // Computed para gerar o valor do QR Code
-    const qrCodeValue = computed(() => {
-      if (!ativoSelecionado.value) return ''
-      
-      // URL que aponta para a página de detalhes do ativo
-    const baseUrl = window.location.origin
-    
-    return `${baseUrl}/tech/ativo/${ativoSelecionado.value.id}`
-    })
-    
+        ativo.value = {
+          id: a.id,
+          nome: a.name,
+          descricao: a.description || 'Sem descrição',
+          ambiente: {
+            id: a.environment?.id || 0,
+            nome: a.environment?.name || 'Não definido',
+            localizacao: a.environment?.localizacao || '---',
+          },
+          status: a.status || 'ativo',
+          qrCode: a.qr_code || '---',
+          criadoEm: a.created_at
+            ? new Date(a.created_at).toLocaleString('pt-BR')
+            : '---',
+          atualizadoEm: a.updated_at
+            ? new Date(a.updated_at).toLocaleString('pt-BR')
+            : '---',
+        }
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada no clique da página para fechar o menu de perfil
+        carregando.value = false
+      } catch (error: any) {
+  console.error('❌ Erro ao carregar ativo:', error)
+
+  if (error.response) {
+    console.error('🧩 Código HTTP:', error.response.status)
+    console.error('🧩 Dados retornados:', error.response.data)
+  } else if (error.request) {
+    console.error('📡 Nenhuma resposta do servidor (erro de rede):', error.request)
+  } else {
+    console.error('⚙️ Erro na configuração da requisição:', error.message)
+  }
+
+  alert('Erro ao carregar dados do ativo.')
+  router.push('/adm/gestao-ativos')
+}
+
     }
 
-    const cadastrarAtivo = () => {
-      router.push('/adm/novo-ativo')
+    // 🔹 Iniciar edição
+    const iniciarEdicao = () => {
+      if (!ativo.value) return
+      formEdit.nome = ativo.value.nome
+      formEdit.descricao = ativo.value.descricao
+      formEdit.ambiente = { ...ativo.value.ambiente }
+      formEdit.status = ativo.value.status
+      editando.value = true
     }
 
-    const goToAtivoDetalhado = (id: number) => {
-      router.push({ path: '/adm/detalhes-ativos', query: { id: id.toString() } })
+    // 🔹 Cancelar edição
+    const cancelarEdicao = () => {
+      editando.value = false
     }
 
-    const abrirModalQRCode = (ativo: Ativo) => {
-      ativoSelecionado.value = ativo
-      modalAberto.value = true
-    }
+    // 🔹 Salvar alterações na API
+    const salvarEdicao = async () => {
+      try {
+        const payload = {
+          name: formEdit.nome,
+          description: formEdit.descricao,
+          status: formEdit.status,
+          environment: formEdit.ambiente.id,
+        }
 
-    const fecharModal = () => {
-      modalAberto.value = false
-      ativoSelecionado.value = null
-    }
+        await api.put(`/ativo/${ativoId}/`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-    const downloadQRCode = () => {
-      if (!ativoSelecionado.value) return
-      
-      // Criar um elemento canvas temporário para download
-      const canvas = document.querySelector('.qr-code canvas') as HTMLCanvasElement
-      if (canvas) {
-        const link = document.createElement('a')
-        link.download = `qrcode-ativo-${ativoSelecionado.value.id}.png`
-        link.href = canvas.toDataURL('image/png')
-        link.click()
+        alert('✅ Alterações salvas com sucesso!')
+        editando.value = false
+        await carregarAtivo()
+      } catch (error) {
+        console.error('❌ Erro ao salvar ativo:', error)
+        alert('Erro ao salvar alterações.')
       }
     }
 
-    const imprimirQRCode = () => {
-      // Simular impressão do QR Code
-      window.print()
-    }
+    // 🔹 Alterar status do ativo
+    const alterarStatus = async () => {
+      try {
+        const novoStatus = ativo.value?.status === 'ativo' ? 'manutencao' : 'ativo'
 
-    const filtrados = computed(() => {
-      return ativos.value.filter((a) => {
-        const matchStatus = filtroStatus.value === 'todos' || a.status === filtroStatus.value
-        const matchAmbiente = filtroAmbiente.value === 'todos' || a.ambiente.id.toString() === filtroAmbiente.value
-        const matchPesquisa =
-          a.nome.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
-          a.descricao.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
-          a.ambiente.nome.toLowerCase().includes(pesquisa.value.toLowerCase())
-        return matchStatus && matchAmbiente && matchPesquisa
-      })
-    })
+        await api.patch(`/ativo/${ativoId}/`, { status: novoStatus }, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-    const ativosOrdenados = computed(() => {
-      const ativosFiltrados = [...filtrados.value]
-      
-      if (ordemExibicao.value === 'recente') {
-        return ativosFiltrados.sort((a, b) => b.id - a.id)
-      } else if (ordemExibicao.value === 'antigo') {
-        return ativosFiltrados.sort((a, b) => a.id - b.id)
-      } else {
-        // Ordenação por nome
-        return ativosFiltrados.sort((a, b) => a.nome.localeCompare(b.nome))
-      }
-    })
-
-    const statusClass = (status: string) => {
-      switch (status) {
-        case 'ativo': return 'status-ativo'
-        case 'manutencao': return 'status-manutencao'
-        default: return ''
+        ativo.value!.status = novoStatus
+        ativo.value!.atualizadoEm = new Date().toLocaleString('pt-BR')
+        alert(`Ativo ${novoStatus === 'manutencao' ? 'colocado em manutenção' : 'reativado'} com sucesso!`)
+      } catch (error) {
+        console.error('❌ Erro ao alterar status do ativo:', error)
+        alert('Erro ao alterar status.')
       }
     }
 
-    const statusIcon = (status: string) => {
-      switch (status) {
-        case 'ativo': return 'check_circle'
-        case 'manutencao': return 'build'
-        default: return ''
+    // 🔹 Excluir ativo
+    const excluirAtivo = async () => {
+      if (!confirm('Tem certeza que deseja excluir este ativo?')) return
+
+      try {
+        await api.delete(`/ativo/${ativoId}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        alert('✅ Ativo excluído com sucesso!')
+        router.push('/adm/gestao-ativos')
+      } catch (error) {
+        console.error('❌ Erro ao excluir ativo:', error)
+        alert('Erro ao excluir ativo.')
       }
     }
 
-    const formatarStatus = (status: string) => {
-      switch (status) {
-        case 'ativo': return 'Ativo'
-        case 'manutencao': return 'Em Manutenção'
-        default: return status
-      }
-    }
+    // 🔹 Utilitários visuais
+    const closeProfileMenu = () => {}
+    const statusClass = (status: string) => status === 'ativo' ? 'status-ativo' : 'status-manutencao'
+    const statusIcon = (status: string) => status === 'ativo' ? 'check_circle' : 'build'
+    const formatarStatus = (status: string) =>
+      status === 'ativo' ? 'Ativo' : status === 'manutencao' ? 'Em Manutenção' : status
 
-    return { 
+    onMounted(() => carregarAtivo())
+
+    return {
+      ativo,
       usuario,
-      filtroStatus,
-      filtroAmbiente,
-      ordemExibicao,
-      pesquisa,
-      ambientes,
-      ativosOrdenados,
-      modalAberto,
-      ativoSelecionado,
-      qrCodeValue,
+      editando,
+      carregando,
+      formEdit,
+      closeProfileMenu,
       statusClass,
       statusIcon,
       formatarStatus,
-      closeProfileMenu,
-      cadastrarAtivo,
-      goToAtivoDetalhado,
-      abrirModalQRCode,
-      fecharModal,
-      downloadQRCode,
-      imprimirQRCode
+      alterarStatus,
+      excluirAtivo,
+      iniciarEdicao,
+      cancelarEdicao,
+      salvarEdicao,
     }
   },
 })

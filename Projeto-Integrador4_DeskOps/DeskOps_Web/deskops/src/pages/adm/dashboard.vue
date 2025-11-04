@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard-page" @click="closeProfileMenu">
     <!-- Sidebar do Admin -->
-    <adm-sidebar :usuario="usuario" />
+    <adm-sidebar />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -140,36 +140,28 @@ import { defineComponent, ref, onMounted, onUnmounted } from 'vue'
 import { Chart, registerables } from 'chart.js'
 import { useRouter } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
+import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api'
 
 Chart.register(...registerables)
 
 export default defineComponent({
   name: 'Dashboard',
-  components: {
-    AdmSidebar
-  },
+  components: { AdmSidebar },
   setup() {
     const router = useRouter()
-    
-    const usuario = ref({
-      nome: 'Administrador',
-      email: 'admin@deskops.com',
-      dataNascimento: '10/05/1980',
-      cpf: '111.222.333-44',
-      endereco: 'Av. Principal, 1000, São Paulo, SP',
-      tipoUsuario: 'Administrador',
-      foto: '', 
-    })
+    const auth = useAuthStore()
 
     const metrics = ref({
-      chamadosAbertos: 24,
-      chamadosConcluidos: 156,
-      chamadosAguardando: 8,
-      chamadosAndamento: 12,
-      chamadosCancelados: 5,
-      totalUsuarios: 342,
-      usuariosAtivos: 289,
-      totalAmbientes: 47
+      chamadosAbertos: 0,
+      chamadosConcluidos: 0,
+      chamadosAguardando: 0,
+      chamadosAndamento: 0,
+      chamadosCancelados: 0,
+      totalUsuarios: 0,
+      usuariosAtivos: 0,
+      totalAmbientes: 0,
+      totalAtivos: 0
     })
 
     const chamadosChart = ref<HTMLCanvasElement>()
@@ -177,196 +169,121 @@ export default defineComponent({
     let chamadosChartInstance: Chart | null = null
     let usuariosChartInstance: Chart | null = null
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada no clique da página para fechar o menu de perfil
+    const closeProfileMenu = () => {}
+    const navigateTo = (route: string) => router.push(route)
+
+    // 🧩 Carregar dados do backend
+    const carregarDados = async () => {
+      const token = auth.access
+      if (!token) {
+        router.push('/')
+        return
+      }
+
+      try {
+        // ✅ Chamados
+        const chamadosResp = await api.get('/chamados/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        const chamados = chamadosResp.data.results || chamadosResp.data
+        metrics.value.chamadosAbertos = chamados.filter(c => c.status?.toLowerCase().includes('aberto')).length
+        metrics.value.chamadosConcluidos = chamados.filter(c => c.status?.toLowerCase().includes('concl')).length
+        metrics.value.chamadosAguardando = chamados.filter(c => c.status?.toLowerCase().includes('aguard')).length
+        metrics.value.chamadosAndamento = chamados.filter(c => c.status?.toLowerCase().includes('andamento')).length
+        metrics.value.chamadosCancelados = chamados.filter(c => c.status?.toLowerCase().includes('cancel')).length
+
+        // ✅ Usuários
+        const usuariosResp = await api.get('/usuarios/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const usuarios = usuariosResp.data
+        metrics.value.totalUsuarios = usuarios.length
+        metrics.value.usuariosAtivos = usuarios.filter(u => u.is_active).length
+
+        // ✅ Ambientes
+        const ambientesResp = await api.get('/environment/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        metrics.value.totalAmbientes = ambientesResp.data.length
+
+        // ✅ Ativos
+        const ativosResp = await api.get('/ativo/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        metrics.value.totalAtivos = ativosResp.data.length
+
+        console.log('✅ Métricas carregadas:', metrics.value)
+
+        // Atualiza gráficos
+        initCharts()
+
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar dados do dashboard:', error)
+      }
     }
 
-    const navigateTo = (route: string) => {
-      router.push(route)
-    }
-
+    // 🎨 Gráficos
     const initCharts = () => {
-      // Destruir gráficos existentes
-      if (chamadosChartInstance) {
-        chamadosChartInstance.destroy()
-      }
-      if (usuariosChartInstance) {
-        usuariosChartInstance.destroy()
-      }
+      if (chamadosChartInstance) chamadosChartInstance.destroy()
+      if (usuariosChartInstance) usuariosChartInstance.destroy()
 
-      // Gráfico de Chamados - COM TODOS OS STATUS
       if (chamadosChart.value) {
         const ctx = chamadosChart.value.getContext('2d')
         if (ctx) {
           chamadosChartInstance = new Chart(ctx, {
-            type: 'line',
+            type: 'bar',
             data: {
-              labels: ['1', '5', '10', '15', '20', '25', '30'],
+              labels: ['Abertos', 'Concluídos', 'Aguardando', 'Andamento', 'Cancelados'],
               datasets: [
                 {
-                  label: 'Abertos',
-                  data: [8, 12, 6, 15, 10, 8, 12],
-                  borderColor: '#0f5132',
-                  backgroundColor: 'rgba(209, 231, 221, 0.1)',
-                  tension: 0.4,
-                  fill: true,
-                  borderWidth: 2
-                },
-                {
-                  label: 'Concluídos',
-                  data: [20, 25, 30, 22, 28, 35, 40],
-                  borderColor: '#065f46',
-                  backgroundColor: 'rgba(209, 250, 229, 0.1)',
-                  tension: 0.4,
-                  fill: true,
-                  borderWidth: 2
-                },
-                {
-                  label: 'Em Andamento',
-                  data: [5, 8, 6, 10, 12, 8, 6],
-                  borderColor: '#084298',
-                  backgroundColor: 'rgba(207, 226, 255, 0.1)',
-                  tension: 0.4,
-                  fill: true,
-                  borderWidth: 2
-                },
-                {
-                  label: 'Aguardando',
-                  data: [3, 5, 8, 6, 4, 7, 5],
-                  borderColor: '#856404',
-                  backgroundColor: 'rgba(255, 243, 205, 0.1)',
-                  tension: 0.4,
-                  fill: true,
-                  borderWidth: 2
-                },
-                {
-                  label: 'Cancelados',
-                  data: [1, 2, 1, 3, 2, 1, 2],
-                  borderColor: '#842029',
-                  backgroundColor: 'rgba(248, 215, 218, 0.1)',
-                  tension: 0.4,
-                  fill: true,
-                  borderWidth: 2
+                  label: 'Chamados',
+                  data: [
+                    metrics.value.chamadosAbertos,
+                    metrics.value.chamadosConcluidos,
+                    metrics.value.chamadosAguardando,
+                    metrics.value.chamadosAndamento,
+                    metrics.value.chamadosCancelados
+                  ],
+                  backgroundColor: [
+                    '#0f5132', '#065f46', '#856404', '#084298', '#842029'
+                  ]
                 }
               ]
             },
             options: {
               responsive: true,
-              maintainAspectRatio: false,
               plugins: {
-                legend: {
-                  position: 'top',
-                  labels: {
-                    usePointStyle: true,
-                    padding: 15
-                  }
-                },
-                tooltip: {
-                  mode: 'index',
-                  intersect: false
-                }
-              },
-              interaction: {
-                mode: 'nearest',
-                axis: 'x',
-                intersect: false
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                  },
-                  title: {
-                    display: true,
-                    text: 'Quantidade de Chamados'
-                  }
-                },
-                x: {
-                  grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                  },
-                  title: {
-                    display: true,
-                    text: 'Dias do Mês'
-                  }
-                }
+                legend: { display: false },
+                title: { display: true, text: 'Chamados por Status' }
               }
             }
           })
         }
       }
 
-      // Gráfico de Usuários
       if (usuariosChart.value) {
         const ctx = usuariosChart.value.getContext('2d')
         if (ctx) {
           usuariosChartInstance = new Chart(ctx, {
-            type: 'line',
+            type: 'pie',
             data: {
-              labels: ['1', '5', '10', '15', '20', '25', '30'],
+              labels: ['Ativos', 'Inativos'],
               datasets: [
                 {
-                  label: 'Usuários Ativos',
-                  data: [250, 265, 270, 275, 280, 285, 289],
-                  borderColor: '#6366f1',
-                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                  tension: 0.4,
-                  fill: true,
-                  borderWidth: 2
-                },
-                {
-                  label: 'Novos Usuários',
-                  data: [5, 8, 3, 6, 4, 7, 5],
-                  borderColor: '#ec4899',
-                  backgroundColor: 'rgba(236, 72, 153, 0.1)',
-                  tension: 0.4,
-                  fill: true,
-                  borderWidth: 2
+                  data: [
+                    metrics.value.usuariosAtivos,
+                    metrics.value.totalUsuarios - metrics.value.usuariosAtivos
+                  ],
+                  backgroundColor: ['#198754', '#dc3545']
                 }
               ]
             },
             options: {
               responsive: true,
-              maintainAspectRatio: false,
               plugins: {
-                legend: {
-                  position: 'top',
-                  labels: {
-                    usePointStyle: true,
-                    padding: 15
-                  }
-                },
-                tooltip: {
-                  mode: 'index',
-                  intersect: false
-                }
-              },
-              interaction: {
-                mode: 'nearest',
-                axis: 'x',
-                intersect: false
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                  },
-                  title: {
-                    display: true,
-                    text: 'Quantidade de Usuários'
-                  }
-                },
-                x: {
-                  grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                  },
-                  title: {
-                    display: true,
-                    text: 'Dias do Mês'
-                  }
-                }
+                legend: { position: 'bottom' },
+                title: { display: true, text: 'Usuários Ativos x Inativos' }
               }
             }
           })
@@ -374,31 +291,23 @@ export default defineComponent({
       }
     }
 
-    onMounted(() => {
-      // Pequeno delay para garantir que o DOM esteja pronto
-      setTimeout(initCharts, 100)
-    })
-
+    onMounted(() => carregarDados())
     onUnmounted(() => {
-      if (chamadosChartInstance) {
-        chamadosChartInstance.destroy()
-      }
-      if (usuariosChartInstance) {
-        usuariosChartInstance.destroy()
-      }
+      chamadosChartInstance?.destroy()
+      usuariosChartInstance?.destroy()
     })
 
-    return { 
-      usuario,
+    return {
       metrics,
       chamadosChart,
       usuariosChart,
       closeProfileMenu,
       navigateTo
     }
-  },
+  }
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

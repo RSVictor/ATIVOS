@@ -36,6 +36,7 @@ class Users(AbstractBaseUser, PermissionsMixin):
     dt_nascimento = models.DateField(null=False, blank=False)
     endereco = models.CharField(max_length=255, null=False, blank=False)
     foto_user = models.ImageField(upload_to='perfil/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     # Campos de permissão
     is_staff = models.BooleanField(default=False)

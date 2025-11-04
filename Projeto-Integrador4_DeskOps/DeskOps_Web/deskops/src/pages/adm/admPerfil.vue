@@ -1,7 +1,7 @@
 <template>
   <div class="perfil-page">
     <!-- Sidebar do Admin -->
-    <adm-sidebar :usuario="usuario" />
+    <adm-sidebar />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -16,9 +16,8 @@
         <h1 class="page-title">Perfil do Administrador</h1>
 
         <div class="cards-container">
-          <!-- Card do Perfil -->
           <div class="card-form">
-            <!-- Header com botão de editar -->
+            <!-- Header -->
             <div class="card-header">
               <div class="header-actions">
                 <button v-if="!editMode" class="edit-btn" @click="enterEditMode">
@@ -26,12 +25,8 @@
                   Editar
                 </button>
                 <div v-else class="action-buttons">
-                  <button class="cancel-btn" @click="cancelEdit">
-                    Cancelar
-                  </button>
-                  <button class="save-btn" @click="saveChanges">
-                    Salvar Alterações
-                  </button>
+                  <button class="cancel-btn" @click="cancelEdit">Cancelar</button>
+                  <button class="save-btn" @click="saveChanges">Salvar Alterações</button>
                 </div>
               </div>
             </div>
@@ -50,7 +45,7 @@
                   <div class="name-container">
                     <h3 class="section-title">Nome Completo</h3>
                     <p v-if="!editMode" class="info-text">{{ usuario.nome }}</p>
-                    <input 
+                    <input
                       v-else
                       v-model="usuarioEditado.nome"
                       type="text"
@@ -61,14 +56,13 @@
                 </div>
               </div>
 
-              <!-- Linha divisória apenas acima do email -->
               <div class="divider-line"></div>
 
               <!-- Email -->
               <div class="form-section">
                 <h3 class="section-title">Email</h3>
                 <p v-if="!editMode" class="info-text">{{ usuario.email }}</p>
-                <input 
+                <input
                   v-else
                   v-model="usuarioEditado.email"
                   type="email"
@@ -77,11 +71,10 @@
                 />
               </div>
 
-              <!-- Demais campos sem linhas divisorias -->
               <div class="form-section">
                 <h3 class="section-title">Data de Nascimento</h3>
                 <p v-if="!editMode" class="info-text">{{ usuario.dataNascimento }}</p>
-                <input 
+                <input
                   v-else
                   v-model="usuarioEditado.dataNascimento"
                   type="text"
@@ -93,7 +86,7 @@
               <div class="form-section">
                 <h3 class="section-title">CPF</h3>
                 <p v-if="!editMode" class="info-text">{{ usuario.cpf }}</p>
-                <input 
+                <input
                   v-else
                   v-model="usuarioEditado.cpf"
                   type="text"
@@ -105,7 +98,7 @@
               <div class="form-section">
                 <h3 class="section-title">Endereço</h3>
                 <p v-if="!editMode" class="info-text">{{ usuario.endereco }}</p>
-                <textarea 
+                <textarea
                   v-else
                   v-model="usuarioEditado.endereco"
                   class="form-textarea"
@@ -138,51 +131,126 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive } from 'vue'
+import { defineComponent, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
+import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api'
 
 export default defineComponent({
   name: 'AdmPerfil',
-  components: {
-    AdmSidebar
-  },
+  components: { AdmSidebar },
   setup() {
     const router = useRouter()
+    const auth = useAuthStore()
     const editMode = ref(false)
 
     const usuario = ref({
-      nome: 'Administrador',
-      email: 'admin@deskops.com',
-      dataNascimento: '10/05/1980',
-      cpf: '111.222.333-44',
-      endereco: 'Av. Principal, 1000, São Paulo, SP',
-      tipoUsuario: 'Administrador',
-      foto: '', 
+      nome: '',
+      email: '',
+      cpf: '',
+      dataNascimento: '',
+      endereco: '',
+      tipoUsuario: '',
+      foto: '',
     })
 
-    const usuarioEditado = reactive({ ...usuario.value })
-
-    // Para desenvolvimento, usando um placeholder
+    const usuarioEditado = ref({ ...usuario.value })
     const defaultFoto = new URL('../../assets/images/default-avatar.png', import.meta.url).href
 
+    // ✅ Carregar dados do administrador logado
+    const carregarDadosUsuario = async () => {
+      try {
+        const token = auth.access
+        if (!token) {
+          console.warn('⚠️ Nenhum token encontrado. Redirecionando para login...')
+          router.push('/')
+          return
+        }
+
+        const response = await api.get('/me/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        const data = response.data
+        usuario.value = {
+          nome: data.name,
+          email: data.email,
+          cpf: data.cpf || '---',
+          dataNascimento: data.dt_nascimento || '---',
+          endereco: data.endereco || '---',
+          tipoUsuario: data.is_staff ? 'Administrador' : 'Usuário',
+          foto: data.foto_user || '',
+        }
+
+        usuarioEditado.value = { ...usuario.value }
+        console.log('👤 Dados do administrador carregados:', usuario.value)
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar dados do administrador:', error.response?.data || error)
+        if (error.response?.status === 401) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+        }
+      }
+    }
+
+    // 🚀 Carregar ao montar componente
+    onMounted(() => {
+      carregarDadosUsuario()
+    })
+
+    // 🟢 Entrar no modo de edição
     const enterEditMode = () => {
-      Object.assign(usuarioEditado, usuario.value)
+      usuarioEditado.value = { ...usuario.value }
       editMode.value = true
     }
 
+    // 🟢 Cancelar edição
     const cancelEdit = () => {
+      usuarioEditado.value = { ...usuario.value }
       editMode.value = false
-      Object.assign(usuarioEditado, usuario.value)
     }
 
-    const saveChanges = () => {
-      Object.assign(usuario.value, usuarioEditado)
-      editMode.value = false
-      console.log('Dados salvos:', usuario.value)
-      alert('Alterações salvas com sucesso!')
+    // 🟢 Salvar alterações
+    const saveChanges = async () => {
+      try {
+        const token = auth.access
+        if (!token) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+          return
+        }
+
+        const payload = {
+          name: usuarioEditado.value.nome,
+          email: usuarioEditado.value.email,
+          cpf: usuarioEditado.value.cpf,
+          dt_nascimento: usuarioEditado.value.dataNascimento,
+          endereco: usuarioEditado.value.endereco,
+        }
+
+        const response = await api.patch('/me/', payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        usuario.value = {
+          ...usuario.value,
+          nome: response.data.name,
+          email: response.data.email,
+          cpf: response.data.cpf,
+          dataNascimento: response.data.dt_nascimento,
+          endereco: response.data.endereco,
+        }
+
+        editMode.value = false
+        alert('✅ Alterações salvas com sucesso!')
+      } catch (error: any) {
+        console.error('❌ Erro ao salvar alterações:', error.response?.data || error)
+        alert('Erro ao salvar alterações. Verifique os campos e tente novamente.')
+      }
     }
 
+    // 🟢 Trocar foto de perfil
     const changePhoto = () => {
       const input = document.createElement('input')
       input.type = 'file'
@@ -190,30 +258,29 @@ export default defineComponent({
       input.onchange = (e) => {
         const target = e.target as HTMLInputElement
         if (target.files && target.files[0]) {
-          const file = target.files[0]
           const reader = new FileReader()
           reader.onload = (e) => {
-            usuarioEditado.foto = e.target?.result as string
+            usuarioEditado.value.foto = e.target?.result as string
           }
-          reader.readAsDataURL(file)
+          reader.readAsDataURL(target.files[0])
         }
       }
       input.click()
     }
 
+    // 🟢 Alterar senha (simulação)
     const changePassword = () => {
       const newPassword = prompt('Digite sua nova senha:')
       if (newPassword) {
-        console.log('Nova senha definida')
-        alert('Senha alterada com sucesso!')
+        alert('Senha alterada com sucesso! (simulação)')
       }
     }
 
     return {
       usuario,
       usuarioEditado,
-      defaultFoto,
       editMode,
+      defaultFoto,
       enterEditMode,
       cancelEdit,
       saveChanges,
@@ -223,6 +290,7 @@ export default defineComponent({
   },
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

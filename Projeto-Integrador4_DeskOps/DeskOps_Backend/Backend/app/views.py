@@ -61,6 +61,15 @@ class RegisterView(APIView):
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class UsuarioDetailView(generics.RetrieveUpdateAPIView):
+    queryset = Users.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer(self, *args, **kwargs):
+        kwargs['partial'] = True  # ✅ permite PATCH parcial
+        return super().get_serializer(*args, **kwargs)
 
 
 @api_view(['PATCH'])

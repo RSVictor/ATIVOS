@@ -9,6 +9,10 @@ from .views import (
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import MeView
+from .views import UsuarioDetailView
+
+
+
 
 # Criação do router
 router = DefaultRouter()
@@ -24,6 +28,8 @@ router.register(r'notificate', NotificateView)
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('aprovar_usuario/<int:pk>/', aprovar_usuario, name='aprovar_usuario'),
+
+    path('api/', include(router.urls)),
 
     # JWT login e refresh
     path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
@@ -44,6 +50,7 @@ urlpatterns = [
     path('usuario/<int:pk>/alterar-status/', alterar_status_usuario, name='alterar_status_usuario'),
     path('usuario/<int:pk>/alterar-role/', alterar_role_usuario, name='alterar_role_usuario'),
     path('usuarios/', listar_usuarios, name='listar_usuarios'),
+    path('usuarios/<int:pk>/', UsuarioDetailView.as_view(), name='usuario_detail'),
 
     # Incluindo todas as rotas do router
     path('', include(router.urls)),

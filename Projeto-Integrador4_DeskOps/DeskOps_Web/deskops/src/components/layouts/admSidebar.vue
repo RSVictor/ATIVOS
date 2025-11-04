@@ -1,9 +1,11 @@
 <template>
   <aside class="sidebar">
+    <!-- Logo -->
     <div class="sidebar-logo">
       <img src="../../assets/images/logodeskops.png" alt="Logo DeskOps" class="logo-image" />
     </div>
 
+    <!-- Navegação -->
     <nav class="sidebar-nav">
       <router-link to="/adm/dashboard" class="nav-link" active-class="active">
         <span class="material-icons">dashboard</span>
@@ -25,8 +27,6 @@
         <span class="material-icons">people</span>
         Gestão de Usuários
       </router-link>
-      
-      
     </nav>
 
     <!-- Perfil -->
@@ -34,12 +34,12 @@
       <div class="sidebar-profile" @click="toggleProfileMenu">
         <div class="profile-image">👤</div>
         <div class="profile-info">
-          <p class="profile-name">Pedro Guerra</p>
+          <p class="profile-name">{{ usuario.nome }}</p>
           <p class="profile-email">{{ usuario.email }}</p>
         </div>
       </div>
 
-      <!-- Dropdown corrigido -->
+      <!-- Dropdown -->
       <transition name="slide-right">
         <div v-if="profileMenuOpen" class="profile-dropdown-right">
           <div class="dropdown-item" @click="goToPerfil">
@@ -55,28 +55,28 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
+import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 
 export default defineComponent({
   name: 'AdmSidebar',
-  props: {
-    usuario: {
-      type: Object,
-      required: true
-    }
-  },
   setup() {
     const router = useRouter()
+    const auth = useAuthStore()
     const profileMenuOpen = ref(false)
 
-    const toggleProfileMenu = () => {
-      profileMenuOpen.value = !profileMenuOpen.value
-    }
+    const usuario = computed(() => {
+      const user = auth.user
+      if (!user) return { nome: 'Administrador', email: 'admin@deskops.com' }
+      return {
+        nome: user.name || 'Administrador',
+        email: user.email || 'admin@deskops.com'
+      }
+    })
 
-    const closeProfileMenu = () => {
-      profileMenuOpen.value = false
-    }
+    const toggleProfileMenu = () => (profileMenuOpen.value = !profileMenuOpen.value)
+    const closeProfileMenu = () => (profileMenuOpen.value = false)
 
     const goToPerfil = () => {
       router.push('/adm/perfil')
@@ -84,20 +84,42 @@ export default defineComponent({
     }
 
     const goToLogin = () => {
+      auth.logout?.()
       router.push('/')
       closeProfileMenu()
     }
 
+    // Fechar menu ao clicar fora
+    const handleClickOutside = (event: Event) => {
+      const profileContainer = document.querySelector('.profile-container')
+      if (profileContainer && !profileContainer.contains(event.target as Node)) {
+        closeProfileMenu()
+      }
+    }
+
+    const initialize = () => document.addEventListener('click', handleClickOutside)
+    const cleanup = () => document.removeEventListener('click', handleClickOutside)
+
     return {
+      usuario,
       profileMenuOpen,
       toggleProfileMenu,
       closeProfileMenu,
       goToPerfil,
       goToLogin,
+      initialize,
+      cleanup
     }
   },
+  mounted() {
+    this.initialize()
+  },
+  beforeUnmount() {
+    this.cleanup()
+  }
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

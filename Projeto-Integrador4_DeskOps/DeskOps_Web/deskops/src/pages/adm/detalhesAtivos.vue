@@ -1,7 +1,7 @@
 <template>
   <div class="detalhes-ativo-page" @click="closeProfileMenu">
     <!-- Sidebar do Admin -->
-    <adm-sidebar :usuario="usuario" />
+    <adm-sidebar />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
