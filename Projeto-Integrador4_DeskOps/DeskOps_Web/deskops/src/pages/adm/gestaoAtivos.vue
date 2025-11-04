@@ -1,9 +1,7 @@
 <template>
   <div class="gestao-ativos-page" @click="closeProfileMenu">
-    <!-- Sidebar do Admin -->
     <adm-sidebar />
 
-    <!-- Conteúdo principal -->
     <main class="main-content">
       <div class="content-area">
         <h1 class="page-title">Gestão de Ativos</h1>
@@ -12,21 +10,19 @@
         <div class="filters">
           <select v-model="filtroStatus" class="filter-select">
             <option value="todos">Todos os Status</option>
-            <option value="ativo">Ativo</option>
-            <option value="manutencao">Em Manutenção</option>
+            <option value="ATIVO">Ativo</option>
+            <option value="EM_MANUTENCAO">Em Manutenção</option>
           </select>
 
           <select v-model="filtroAmbiente" class="filter-select">
             <option value="todos">Todos os Ambientes</option>
-            <option v-for="ambiente in ambientes" :key="ambiente.id" :value="ambiente.id">
+            <option
+              v-for="ambiente in ambientes"
+              :key="ambiente.id"
+              :value="ambiente.id"
+            >
               {{ ambiente.nome }}
             </option>
-          </select>
-
-          <select v-model="ordemExibicao" class="filter-select">
-            <option value="recente">Mais recente</option>
-            <option value="antigo">Mais antigo</option>
-            <option value="nome">Por nome</option>
           </select>
 
           <input
@@ -36,61 +32,37 @@
             class="filter-search"
           />
 
-          <!-- Botão Cadastrar Ativo -->
           <button class="btn-cadastrar" @click="cadastrarAtivo">
             <span class="material-icons">add</span>
             Cadastrar Ativo
           </button>
         </div>
 
-        <!-- Tabela de ativos -->
+        <!-- Tabela -->
         <div class="table-container">
           <table class="ativos-table">
             <thead>
               <tr>
-                <th class="col-id">ID</th>
-                <th class="col-nome">Nome do Ativo</th>
-                <th class="col-descricao">Descrição</th>
-                <th class="col-ambiente">Ambiente</th>
-                <th class="col-status">Status</th>
-                <th class="col-qrcode">QR Code</th>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Descrição</th>
+                <th>Ambiente</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="ativo in ativosOrdenados"
+                v-for="ativo in ativosFiltradosOrdenados"
                 :key="ativo.id"
-                @click="goToAtivoDetalhado(ativo.id)"
                 class="clickable-row"
               >
                 <td>{{ ativo.id }}</td>
-                <td>
-                  <p class="ativo-nome">{{ ativo.nome }}</p>
-                </td>
-                <td>
-                  <p class="ativo-descricao">{{ ativo.descricao }}</p>
-                </td>
-                <td>
-                  <div class="ambiente-info">
-                    <p class="ambiente-nome">{{ ativo.ambiente.nome }}</p>
-                    <p class="ambiente-local">{{ ativo.ambiente.localizacao }}</p>
-                  </div>
-                </td>
+                <td>{{ ativo.nome }}</td>
+                <td>{{ ativo.descricao }}</td>
+                <td>{{ ativo.ambiente.nome }}</td>
                 <td>
                   <span :class="['status', statusClass(ativo.status)]">
-                    <span class="material-icons status-icon">
-                      {{ statusIcon(ativo.status) }}
-                    </span>
                     {{ formatarStatus(ativo.status) }}
-                  </span>
-                </td>
-                <td>
-                  <span 
-                    class="qr-code-available clickable-qr"
-                    @click.stop="abrirModalQRCode(ativo)"
-                  >
-                    <span class="material-icons">qr_code_2</span>
-                    Visualizar
                   </span>
                 </td>
               </tr>
@@ -99,86 +71,11 @@
         </div>
       </div>
     </main>
-
-    <!-- Modal do QR Code -->
-    <div v-if="modalAberto" class="modal-overlay" @click="fecharModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h2 class="modal-title">QR Code do Ativo</h2>
-          <button class="modal-close" @click="fecharModal">
-            <span class="material-icons">close</span>
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <!-- Informações do Ativo -->
-          <div class="info-section">
-            <h3 class="info-title">Informações do Ativo</h3>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">ID:</span>
-                <span class="info-value">{{ ativoSelecionado?.id }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Nome:</span>
-                <span class="info-value">{{ ativoSelecionado?.nome }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Descrição:</span>
-                <span class="info-value">{{ ativoSelecionado?.descricao }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Ambiente:</span>
-                <span class="info-value">{{ ativoSelecionado?.ambiente.nome }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Localização:</span>
-                <span class="info-value">{{ ativoSelecionado?.ambiente.localizacao }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Status:</span>
-                <span :class="['info-value', statusClass(ativoSelecionado?.status || '')]">
-                  {{ formatarStatus(ativoSelecionado?.status || '') }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- QR Code -->
-          <div class="qr-section">
-            <h3 class="qr-title">Código QR</h3>
-            <div class="qr-container">
-              <div class="qr-code-wrapper">
-                <qrcode-vue
-                  :value="qrCodeValue"
-                  :size="200"
-                  level="H"
-                  render-as="canvas"
-                  class="qr-code"
-                />
-                <p class="qr-subtext">ID: {{ ativoSelecionado?.id }}</p>
-              </div>
-            </div>
-            <div class="qr-actions">
-              <button class="btn-download" @click="downloadQRCode">
-                <span class="material-icons">download</span>
-                Baixar QR Code
-              </button>
-              <button class="btn-print" @click="imprimirQRCode">
-                <span class="material-icons">print</span>
-                Imprimir
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { defineComponent, ref, computed, onMounted } from 'vue'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
@@ -186,203 +83,128 @@ import { useAuthStore } from '@/stores/authStore'
 interface Ambiente {
   id: number
   nome: string
-  localizacao: string
 }
 
 interface Ativo {
   id: number
   nome: string
   descricao: string
-  ambiente: Ambiente
   status: string
-  qrCode: string
-  criadoEm: string
-  atualizadoEm: string
+  ambiente: Ambiente
 }
 
 export default defineComponent({
-  name: 'DetalhesAtivos',
+  name: 'GestaoAtivos',
   components: { AdmSidebar },
 
   setup() {
-    const route = useRoute()
-    const router = useRouter()
     const auth = useAuthStore()
     const token = auth.access
-    const ativoId = Number(route.params.id)
 
-    const editando = ref(false)
-    const carregando = ref(true)
-    const ativo = ref<Ativo | null>(null)
+    const ativos = ref<Ativo[]>([])
+    const ambientes = ref<Ambiente[]>([])
 
-    const formEdit = reactive({
-      nome: '',
-      descricao: '',
-      ambiente: {
-        id: 0,
-        nome: '',
-        localizacao: ''
-      },
-      status: ''
-    })
+    const filtroStatus = ref('todos')
+    const filtroAmbiente = ref('todos')
+    const pesquisa = ref('')
 
-    // 🔹 Usuário logado
-    const usuario = ref({
-      nome: 'Administrador',
-      email: 'admin@deskops.com',
-      tipoUsuario: 'Administrador',
-      foto: '',
-    })
-
-    // 🔹 Buscar ativo da API
-    const carregarAtivo = async () => {
+    // 🔹 Buscar ativos da API
+    const carregarAtivos = async () => {
       try {
-        const response = await api.get(`/ativo/${ativoId}/`, {
+        const response = await api.get('/ativo/', {
           headers: { Authorization: `Bearer ${token}` },
         })
 
-        console.log('✅ Dados recebidos do ativo:', response.data)
-        const a = response.data
+        console.log('✅ Ativos recebidos:', response.data)
 
-        ativo.value = {
+        const data = Array.isArray(response.data)
+          ? response.data
+          : response.data.results
+
+        ativos.value = data.map((a: any) => ({
           id: a.id,
           nome: a.name,
           descricao: a.description || 'Sem descrição',
+          status: a.status || 'ATIVO',
           ambiente: {
-            id: a.environment?.id || 0,
-            nome: a.environment?.name || 'Não definido',
-            localizacao: a.environment?.localizacao || '---',
+            id: a.environment_FK || 0,
+            nome: `Ambiente ${a.environment_FK || 'N/D'}`,
           },
-          status: a.status || 'ativo',
-          qrCode: a.qr_code || '---',
-          criadoEm: a.created_at
-            ? new Date(a.created_at).toLocaleString('pt-BR')
-            : '---',
-          atualizadoEm: a.updated_at
-            ? new Date(a.updated_at).toLocaleString('pt-BR')
-            : '---',
-        }
-
-        carregando.value = false
-      } catch (error: any) {
-  console.error('❌ Erro ao carregar ativo:', error)
-
-  if (error.response) {
-    console.error('🧩 Código HTTP:', error.response.status)
-    console.error('🧩 Dados retornados:', error.response.data)
-  } else if (error.request) {
-    console.error('📡 Nenhuma resposta do servidor (erro de rede):', error.request)
-  } else {
-    console.error('⚙️ Erro na configuração da requisição:', error.message)
-  }
-
-  alert('Erro ao carregar dados do ativo.')
-  router.push('/adm/gestao-ativos')
-}
-
-    }
-
-    // 🔹 Iniciar edição
-    const iniciarEdicao = () => {
-      if (!ativo.value) return
-      formEdit.nome = ativo.value.nome
-      formEdit.descricao = ativo.value.descricao
-      formEdit.ambiente = { ...ativo.value.ambiente }
-      formEdit.status = ativo.value.status
-      editando.value = true
-    }
-
-    // 🔹 Cancelar edição
-    const cancelarEdicao = () => {
-      editando.value = false
-    }
-
-    // 🔹 Salvar alterações na API
-    const salvarEdicao = async () => {
-      try {
-        const payload = {
-          name: formEdit.nome,
-          description: formEdit.descricao,
-          status: formEdit.status,
-          environment: formEdit.ambiente.id,
-        }
-
-        await api.put(`/ativo/${ativoId}/`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        alert('✅ Alterações salvas com sucesso!')
-        editando.value = false
-        await carregarAtivo()
+        }))
       } catch (error) {
-        console.error('❌ Erro ao salvar ativo:', error)
-        alert('Erro ao salvar alterações.')
+        console.error('❌ Erro ao carregar ativos:', error)
       }
     }
 
-    // 🔹 Alterar status do ativo
-    const alterarStatus = async () => {
+    // 🔹 Buscar ambientes da API
+    const carregarAmbientes = async () => {
       try {
-        const novoStatus = ativo.value?.status === 'ativo' ? 'manutencao' : 'ativo'
-
-        await api.patch(`/ativo/${ativoId}/`, { status: novoStatus }, {
+        const response = await api.get('/environment/', {
           headers: { Authorization: `Bearer ${token}` },
         })
-
-        ativo.value!.status = novoStatus
-        ativo.value!.atualizadoEm = new Date().toLocaleString('pt-BR')
-        alert(`Ativo ${novoStatus === 'manutencao' ? 'colocado em manutenção' : 'reativado'} com sucesso!`)
+        ambientes.value = Array.isArray(response.data)
+          ? response.data
+          : response.data.results.map((a: any) => ({
+              id: a.id,
+              nome: a.name,
+            }))
       } catch (error) {
-        console.error('❌ Erro ao alterar status do ativo:', error)
-        alert('Erro ao alterar status.')
+        console.error('❌ Erro ao carregar ambientes:', error)
       }
     }
 
-    // 🔹 Excluir ativo
-    const excluirAtivo = async () => {
-      if (!confirm('Tem certeza que deseja excluir este ativo?')) return
+    // 🔹 Filtros
+    const ativosFiltrados = computed(() => {
+      return ativos.value.filter((a) => {
+        const matchStatus =
+          filtroStatus.value === 'todos' || a.status === filtroStatus.value
+        const matchAmbiente =
+          filtroAmbiente.value === 'todos' ||
+          a.ambiente.id === filtroAmbiente.value
+        const matchPesquisa =
+          a.nome.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
+          a.descricao.toLowerCase().includes(pesquisa.value.toLowerCase())
 
-      try {
-        await api.delete(`/ativo/${ativoId}/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        alert('✅ Ativo excluído com sucesso!')
-        router.push('/adm/gestao-ativos')
-      } catch (error) {
-        console.error('❌ Erro ao excluir ativo:', error)
-        alert('Erro ao excluir ativo.')
-      }
+        return matchStatus && matchAmbiente && matchPesquisa
+      })
+    })
+
+    const ativosFiltradosOrdenados = computed(() =>
+      [...ativosFiltrados.value].sort((a, b) => a.nome.localeCompare(b.nome))
+    )
+
+    const cadastrarAtivo = () => {
+      console.log('📦 Redirecionar para cadastro de ativo...')
     }
 
-    // 🔹 Utilitários visuais
     const closeProfileMenu = () => {}
-    const statusClass = (status: string) => status === 'ativo' ? 'status-ativo' : 'status-manutencao'
-    const statusIcon = (status: string) => status === 'ativo' ? 'check_circle' : 'build'
-    const formatarStatus = (status: string) =>
-      status === 'ativo' ? 'Ativo' : status === 'manutencao' ? 'Em Manutenção' : status
 
-    onMounted(() => carregarAtivo())
+    const statusClass = (status: string) =>
+      status === 'ATIVO' ? 'status-ativo' : 'status-manutencao'
+
+    const formatarStatus = (status: string) =>
+      status === 'ATIVO' ? 'Ativo' : 'Em Manutenção'
+
+    onMounted(() => {
+      carregarAtivos()
+      carregarAmbientes()
+    })
 
     return {
-      ativo,
-      usuario,
-      editando,
-      carregando,
-      formEdit,
+      ativos,
+      ambientes,
+      filtroStatus,
+      filtroAmbiente,
+      pesquisa,
+      ativosFiltradosOrdenados,
+      cadastrarAtivo,
       closeProfileMenu,
       statusClass,
-      statusIcon,
       formatarStatus,
-      alterarStatus,
-      excluirAtivo,
-      iniciarEdicao,
-      cancelarEdicao,
-      salvarEdicao,
     }
   },
 })
 </script>
-
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 

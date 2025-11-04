@@ -88,7 +88,7 @@
               <span class="material-icons metric-icon icon-ativos">inventory</span>
               <h3 class="metric-title">Ativos</h3>
             </div>
-            <div class="metric-value">{{ metrics.usuariosAtivos }}</div>
+            <div class="metric-value">{{ metrics.totalAtivos }}</div>
             <div class="metric-trend positive">
               <span class="material-icons">trending_up</span>
               +7% vs último mês

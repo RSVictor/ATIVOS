@@ -29,7 +29,6 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('aprovar_usuario/<int:pk>/', aprovar_usuario, name='aprovar_usuario'),
 
-    path('api/', include(router.urls)),
 
     # JWT login e refresh
     path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
