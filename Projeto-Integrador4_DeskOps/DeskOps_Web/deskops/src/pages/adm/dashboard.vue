@@ -173,55 +173,62 @@ export default defineComponent({
     const navigateTo = (route: string) => router.push(route)
 
     // 🧩 Carregar dados do backend
-    const carregarDados = async () => {
-      const token = auth.access
-      if (!token) {
-        router.push('/')
-        return
-      }
+const carregarDados = async () => {
+  const token = auth.access
+  if (!token) {
+    router.push('/')
+    return
+  }
 
-      try {
-        // ✅ Chamados
-        const chamadosResp = await api.get('/chamados/', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+  try {
+    // ✅ Chamados
+    const chamadosResp = await api.get('/chamados/', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
-        const chamados = chamadosResp.data.results || chamadosResp.data
-        metrics.value.chamadosAbertos = chamados.filter(c => c.status?.toLowerCase().includes('aberto')).length
-        metrics.value.chamadosConcluidos = chamados.filter(c => c.status?.toLowerCase().includes('concl')).length
-        metrics.value.chamadosAguardando = chamados.filter(c => c.status?.toLowerCase().includes('aguard')).length
-        metrics.value.chamadosAndamento = chamados.filter(c => c.status?.toLowerCase().includes('andamento')).length
-        metrics.value.chamadosCancelados = chamados.filter(c => c.status?.toLowerCase().includes('cancel')).length
+    const chamados = chamadosResp.data.results || chamadosResp.data
+    metrics.value.chamadosAbertos = chamados.filter(c => c.status?.toLowerCase().includes('aberto')).length
+    metrics.value.chamadosConcluidos = chamados.filter(c => c.status?.toLowerCase().includes('concl')).length
+    metrics.value.chamadosAguardando = chamados.filter(c => c.status?.toLowerCase().includes('aguard')).length
+    metrics.value.chamadosAndamento = chamados.filter(c => c.status?.toLowerCase().includes('andamento')).length
+    metrics.value.chamadosCancelados = chamados.filter(c => c.status?.toLowerCase().includes('cancel')).length
 
-        // ✅ Usuários
-        const usuariosResp = await api.get('/usuarios/', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const usuarios = usuariosResp.data
-        metrics.value.totalUsuarios = usuarios.length
-        metrics.value.usuariosAtivos = usuarios.filter(u => u.is_active).length
+    // ✅ Usuários
+    const usuariosResp = await api.get('/usuarios/', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const usuarios = usuariosResp.data.results || usuariosResp.data
+    metrics.value.totalUsuarios = usuarios.length
+    metrics.value.usuariosAtivos = usuarios.filter(u => u.is_active).length
 
-        // ✅ Ambientes
-        const ambientesResp = await api.get('/environment/', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        metrics.value.totalAmbientes = ambientesResp.data.length
+    // ✅ Ambientes
+    const ambientesResp = await api.get('/environment/', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const ambientes = ambientesResp.data.results || ambientesResp.data
+    metrics.value.totalAmbientes = ambientes.length
 
-        // ✅ Ativos
-        const ativosResp = await api.get('/ativo/', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        metrics.value.totalAtivos = ativosResp.data.length
+    // ✅ Ativos
+    const ativosResp = await api.get('/ativo/', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const ativos = ativosResp.data.results || ativosResp.data
+    metrics.value.totalAtivos = ativos.length
 
-        console.log('✅ Métricas carregadas:', metrics.value)
+    console.log('✅ Métricas carregadas:', metrics.value)
 
-        // Atualiza gráficos
-        initCharts()
+    // Atualiza gráficos
+    initCharts()
 
-      } catch (error: any) {
-        console.error('❌ Erro ao carregar dados do dashboard:', error)
-      }
+  } catch (error: any) {
+    console.error('❌ Erro ao carregar dados do dashboard:', error)
+    if (error.response) {
+      console.log('🧩 Código HTTP:', error.response.status)
+      console.log('🧩 Dados retornados:', error.response.data)
     }
+  }
+}
+
 
     // 🎨 Gráficos
     const initCharts = () => {
