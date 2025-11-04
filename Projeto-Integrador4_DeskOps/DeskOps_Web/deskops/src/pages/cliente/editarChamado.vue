@@ -1,7 +1,7 @@
 <template>
   <div class="editar-chamado-page">
     <!-- Sidebar como componente -->
-    <cliente-sidebar :usuario="usuario" />
+    <cliente-sidebar />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -124,7 +124,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted } from 'vue'
+import { defineComponent, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
 import api from '@/services/api'
@@ -132,19 +132,12 @@ import { useAuthStore } from '@/stores/authStore'
 
 export default defineComponent({
   name: 'EditarChamado',
-  components: {
-    ClienteSidebar
-  },
+  components: { ClienteSidebar },
+
   setup() {
     const router = useRouter()
     const route = useRoute()
     const auth = useAuthStore()
-
-    // ✅ Usuário logado
-    const usuario = ref({
-      nome: auth.user?.name || 'Usuário',
-      email: auth.user?.email || 'sem@email.com'
-    })
 
     // ✅ Campos do chamado
     const titulo = ref('')
@@ -154,20 +147,27 @@ export default defineComponent({
     const imagemURL = ref<string | null>(null)
     const imagem = ref<File | null>(null)
 
-    // ✅ Opções de categoria e prioridade
+    // ✅ Opções fixas
     const categorias = ref(['Manutenção', 'Suporte', 'Instalação', 'Rede', 'Software', 'Hardware'])
     const prioridades = ref([
       { value: 'alta', label: 'Alta' },
       { value: 'media', label: 'Média' },
       { value: 'baixa', label: 'Baixa' },
     ])
+
     const maxDescricaoChars = 2830
 
-    // ✅ Carrega dados do chamado existente ao abrir a página
+    // ✅ Carregar dados do chamado
     const carregarChamado = async () => {
       try {
         const id = route.params.id
         const token = auth.access
+
+        if (!token) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+          return
+        }
 
         const response = await api.get(`/chamados/${id}/`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -187,42 +187,51 @@ export default defineComponent({
 
     onMounted(() => carregarChamado())
 
-    // ✅ Atualiza o chamado
-   const salvarChamado = async () => {
-  try {
-    const id = route.params.id
-    const token = auth.access
+    // ✅ Atualizar chamado
+    const salvarChamado = async () => {
+      try {
+        const id = route.params.id
+        const token = auth.access
 
-    const formData = new FormData()
-    formData.append('title', titulo.value)
-    formData.append('description', descricao.value)
-    formData.append('prioridade', prioridade.value.toUpperCase())
+        if (!token) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+          return
+        }
 
-    // 🔹 Aqui: verifique se categoria é ID ou nome
-    if (!isNaN(Number(categoria.value))) {
-      formData.append('environment', categoria.value)
+        const formData = new FormData()
+        formData.append('title', titulo.value)
+        formData.append('description', descricao.value)
+        formData.append('prioridade', prioridade.value.toUpperCase())
+
+        // 🔹 Categoria (verifica se é ID ou nome)
+        if (!isNaN(Number(categoria.value))) {
+          formData.append('environment', categoria.value)
+        } else {
+          formData.append('environment', categoria.value)
+        }
+
+        if (imagem.value) {
+          formData.append('photo', imagem.value)
+        }
+
+        const response = await api.patch(`/chamados/${id}/`, formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+
+        console.log('✅ Chamado atualizado:', response.data)
+        alert('Chamado atualizado com sucesso!')
+        router.push(`/cliente/chamado/${id}`)
+      } catch (error: any) {
+        console.error('❌ Erro ao atualizar chamado:', error.response?.data || error)
+        alert('Erro ao salvar alterações. Verifique os dados e tente novamente.')
+      }
     }
 
-    if (imagem.value) {
-      formData.append('photo', imagem.value)
-    }
-
-    const response = await api.patch(`/chamados/${id}/`, formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-
-    console.log('✅ Chamado atualizado:', response.data)
-    alert('Chamado atualizado com sucesso!')
-    router.push(`/cliente/chamado/${id}`)
-  } catch (error: any) {
-    console.error('❌ Erro ao atualizar chamado:', error.response?.data || error)
-    alert(`Erro ao salvar alterações: ${JSON.stringify(error.response?.data || error)}`)
-  }
-}
-
+    // ✅ Upload de imagem
     const onFileChange = (event: Event) => {
       const target = event.target as HTMLInputElement
       if (target.files && target.files[0]) {
@@ -231,7 +240,7 @@ export default defineComponent({
       }
     }
 
-    // ✅ Funções auxiliares para prioridade
+    // ✅ Funções auxiliares de prioridade
     const prioridadeClass = (prioridade: string) => {
       switch (prioridade.toLowerCase()) {
         case 'alta': return 'prioridade-alta'
@@ -260,7 +269,6 @@ export default defineComponent({
     }
 
     return {
-      usuario,
       titulo,
       descricao,
       categoria,
@@ -278,7 +286,6 @@ export default defineComponent({
   },
 })
 </script>
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

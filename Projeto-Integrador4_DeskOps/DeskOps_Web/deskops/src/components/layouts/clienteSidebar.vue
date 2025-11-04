@@ -45,23 +45,28 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
+import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 
 export default defineComponent({
   name: 'ClienteSidebar',
-  props: {
-    usuario: {
-      type: Object,
-      default: () => ({
-        nome: 'Lucas Santino',
-        email: 'lucas@email.com'
-      })
-    }
-  },
-  setup(props) {
+  setup() {
     const router = useRouter()
+    const auth = useAuthStore()
     const profileMenuOpen = ref(false)
+
+    // ✅ Computed seguro, sincronizado com o Pinia
+    const usuario = computed(() => {
+      const user = auth.user
+      if (!user) {
+        return { nome: 'Usuário', email: 'sem@email.com' }
+      }
+      return {
+        nome: user.name || 'Usuário',
+        email: user.email || 'sem@email.com'
+      }
+    })
 
     const toggleProfileMenu = () => {
       profileMenuOpen.value = !profileMenuOpen.value
@@ -77,6 +82,7 @@ export default defineComponent({
     }
 
     const goToLogin = () => {
+      auth.logout?.() // se tiver logout no store
       router.push('/')
       closeProfileMenu()
     }
@@ -89,17 +95,12 @@ export default defineComponent({
       }
     }
 
-    // Adicionar event listener quando o componente montar
-    const initialize = () => {
-      document.addEventListener('click', handleClickOutside)
-    }
-
-    // Remover event listener quando o componente desmontar
-    const cleanup = () => {
-      document.removeEventListener('click', handleClickOutside)
-    }
+    // Lifecycle
+    const initialize = () => document.addEventListener('click', handleClickOutside)
+    const cleanup = () => document.removeEventListener('click', handleClickOutside)
 
     return {
+      usuario,
       profileMenuOpen,
       toggleProfileMenu,
       closeProfileMenu,
@@ -117,6 +118,7 @@ export default defineComponent({
   }
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

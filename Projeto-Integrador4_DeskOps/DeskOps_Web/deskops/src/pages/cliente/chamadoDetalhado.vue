@@ -1,7 +1,7 @@
 <template>
   <div class="chamado-detalhado-page" @click="closeProfileMenu">
     <!-- Sidebar como componente -->
-    <cliente-sidebar :usuario="usuario" />
+    <cliente-sidebar />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -128,25 +128,27 @@ export default defineComponent({
     const route = useRoute()
     const auth = useAuthStore()
 
-    const usuario = ref({
-      nome: auth.user?.name || 'Usuário',
-      email: auth.user?.email || 'sem@email.com'
-    })
-
     const chamado = ref<any>(null)
     const tecnico = ref<any>(null)
 
-    // Função para buscar o chamado
+    // ✅ Função para buscar os detalhes do chamado
     const carregarChamado = async () => {
       try {
         const id = route.params.id
         const token = auth.access
+
+        if (!token) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+          return
+        }
 
         const response = await api.get(`/chamados/${id}/`, {
           headers: { Authorization: `Bearer ${token}` },
         })
 
         const data = response.data
+
         chamado.value = {
           id: data.id,
           titulo: data.title,
@@ -163,14 +165,22 @@ export default defineComponent({
           },
         }
 
-        // Exemplo de técnico (caso o campo employee venha do backend)
-        if (data.employee && data.employee.length > 0) {
+        // ✅ Técnico responsável (ajustado para os dois possíveis campos)
+        if (data.employee) {
           tecnico.value = {
-            nome: data.employee[0]?.name || '---',
-            email: data.employee[0]?.email || '---',
+            name: data.employee.name || '---',
+            email: data.employee.email || '---'
+          }
+        } else if (data.assigned_to) {
+          tecnico.value = {
+            name: data.assigned_to.name || '---',
+            email: data.assigned_to.email || '---'
           }
         } else {
-          tecnico.value = { name: 'Não atribuído', email: 'Não atribuído' }
+          tecnico.value = {
+            name: 'Não atribuído',
+            email: 'Não atribuído'
+          }
         }
 
         console.log('📋 Chamado carregado:', chamado.value)
@@ -180,8 +190,9 @@ export default defineComponent({
       }
     }
 
+    // ✅ Funções auxiliares para exibição de status e prioridade
     const statusClass = (status: string) => {
-      const s = status.toLowerCase()
+      const s = status?.toLowerCase() || ''
       if (s.includes('concl')) return 'status-concluido'
       if (s.includes('aberto')) return 'status-aberto'
       if (s.includes('aguard')) return 'status-aguardando'
@@ -191,7 +202,7 @@ export default defineComponent({
     }
 
     const statusIcon = (status: string) => {
-      const s = status.toLowerCase()
+      const s = status?.toLowerCase() || ''
       if (s.includes('concl')) return 'check_circle'
       if (s.includes('aberto')) return 'radio_button_unchecked'
       if (s.includes('aguard')) return 'hourglass_top'
@@ -227,6 +238,7 @@ export default defineComponent({
       }
     }
 
+    // ✅ Função para encerrar o chamado
     const encerrarChamado = async () => {
       try {
         const id = route.params.id
@@ -245,7 +257,6 @@ export default defineComponent({
     })
 
     return {
-      usuario,
       chamado,
       tecnico,
       statusClass,
@@ -253,11 +264,12 @@ export default defineComponent({
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
-      encerrarChamado,
+      encerrarChamado
     }
   },
 })
 </script>
+
 
 
 <style scoped>
@@ -274,7 +286,7 @@ export default defineComponent({
 html, body, #app {
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  overflow: auto; /* ✅ antes era hidden */
 }
 
 /* CONTAINER PRINCIPAL - FULLSCREEN */

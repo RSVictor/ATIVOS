@@ -102,11 +102,12 @@ class Chamado(models.Model):
         related_name='chamado_usuario_FK',
         on_delete=models.CASCADE
     )
-    employee = models.ManyToManyField(
-        Users,
-        related_name='chamado_funcionario_FK',
-        blank=True
-    )
+    employee = models.ForeignKey(  
+        Users, 
+        on_delete=models.SET_NULL,
+        null=True, blank=True, 
+        related_name='chamados')
+
     asset = models.ForeignKey(
         Ativo,
         related_name='chamado_ativo_FK',

@@ -28,7 +28,7 @@ import PerfilCliente from '@/pages/cliente/perfil.vue'
 
 // --- Técnico Pages ---
 import ChamadosTecnico from '@/pages/tecnico/chamadosTecnico.vue'
-import TecnicoChamaDetalha from '@/pages/tecnico/tecnico_chamaDetalha.vue'
+import TecnicoChamaDetalha from '@/pages/tecnico/TecnicoChamaDetalha.vue'
 import TecnicoPerfil from '@/pages/tecnico/tecnicoPerfil.vue'
 import ChamadosLista from '@/pages/tecnico/chamadosLista.vue'
 
@@ -62,7 +62,7 @@ const routes: Array<RouteRecordRaw> = [
   // Técnico Routes
   { path: '/tecnico/chamados', name: 'ChamadosTecnico', component: ChamadosTecnico, meta: { role: 'tecnico' } },
   { path: '/tecnico/chamados-lista', name: 'ChamadosLista', component: ChamadosLista, meta: { role: 'tecnico' } },
-  { path: '/tecnico/chamado-detalhado', name: 'TecnicoChamaDetalha', component: TecnicoChamaDetalha, meta: { role: 'tecnico' } },
+  { path: '/tecnico/chamado-detalhado/:id', name: 'TecnicoChamaDetalha', component: TecnicoChamaDetalha, meta: { role: 'tecnico' } },
   { path: '/tecnico/perfil', name: 'TecnicoPerfil', component: TecnicoPerfil, meta: { role: 'tecnico' } },
 
   // Pública (QR Code)

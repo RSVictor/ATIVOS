@@ -28,7 +28,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class EnvironmentSerializer(serializers.ModelSerializer):
     # Mostra informações do responsável (funcionário)
-    employee_name = serializers.CharField(source='employee.name', read_only=True)
+    employee = serializers.CharField(source='employee.name', read_only=True)
     class Meta:
         model = Environment
         fields = '__all__'
@@ -55,48 +55,52 @@ class ChamadoSerializer(serializers.ModelSerializer):
 
     photo = serializers.ImageField(required=False, allow_null=True)
     creator = UserSerializer(read_only=True)
+    employee = UserSerializer(read_only=True)
+    employee_id = serializers.PrimaryKeyRelatedField(
+    source='employee', queryset=Users.objects.all(), write_only=True, required=False
+    )
+    ultima_acao = serializers.CharField(read_only=True)
+    data_ultima_acao = serializers.DateTimeField(read_only=True)
+
     class Meta:
         model = Chamado
         fields = '__all__'
         read_only_fields = ['creator', 'dt_criacao', 'update_date']
 
-    def validate(self, attrs):
-        environment = attrs.get('environment', None)
-        asset = attrs.get('asset', None)
-
-        if environment and asset:
-            if asset.environment_FK != environment:
-                raise serializers.ValidationError(
-                    {"asset": "O ativo selecionado não pertence ao ambiente escolhido."}
-                )
-        self.context['environment'] = environment
-        return attrs
+    def validate_status(self, value):
+        mapa = {
+            'aguardando': 'AGUARDANDO_ATENDIMENTO',
+            'aguardando atendimento': 'AGUARDANDO_ATENDIMENTO',
+            'em andamento': 'EM_ANDAMENTO',
+            'concluído': 'CONCLUIDO',
+            'concluido': 'CONCLUIDO',
+            'cancelado': 'CANCELADO',
+            'aberto': 'ABERTO',
+        }
+        if isinstance(value, str):
+            value = mapa.get(value.lower().strip(), value)
+        return value
 
     def update(self, instance, validated_data):
         request = self.context.get('request')
         user = request.user if request else None
 
-        if user:
-            if user.role == 'usuario':
-                allowed_fields = ['title', 'description', 'environment', 'asset', 'photo']
-                for field in list(validated_data.keys()):
-                    if field not in allowed_fields:
-                        validated_data.pop(field)
+         # ✅ Permite o técnico atualizar o status e se atribuir
+        if user and user.role == 'tecnico':
+            if 'employee' in self.initial_data:
+                instance.employee_id = self.initial_data.get('employee')
+            if 'status' in self.initial_data:
+                instance.status = self.initial_data.get('status')
+            instance.save()
+            return instance
 
-            elif user.role == 'tecnico':
-                allowed_fields = ['status']
-                for field in list(validated_data.keys()):
-                    if field not in allowed_fields:
-                        validated_data.pop(field)
-            # Admin pode alterar todos os campos
-
-        return super().update(instance, validated_data)
 
     def create(self, validated_data):
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             validated_data['creator'] = request.user
         return super().create(validated_data)
+
 
 
 class NotificateSerializer(serializers.ModelSerializer):

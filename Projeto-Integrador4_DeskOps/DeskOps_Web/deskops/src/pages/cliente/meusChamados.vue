@@ -1,6 +1,6 @@
 <template>
   <div class="meus-chamados-page" @click="closeProfileMenu">
-    <cliente-sidebar :usuario="usuario" />
+    <cliente-sidebar />
     <main class="main-content">
       <div class="content-area">
         <h1 class="page-title">Meus Chamados</h1>
@@ -120,139 +120,173 @@ export default defineComponent({
     const router = useRouter()
     const auth = useAuthStore()
 
-    // 🔽 Filtros
+    // 🔽 Filtros e pesquisa
     const filtroStatus = ref('todos')
     const filtroPrioridade = ref('todos')
     const ordemExibicao = ref('recente')
     const pesquisa = ref('')
 
-    const usuario = ref({
-      nome: auth.user?.name || 'Usuário',
-      email: auth.user?.email || 'sem@email.com'
-    })
-
+    // 📋 Lista de chamados
     const chamados = ref<Chamado[]>([])
 
-    // ✅ Função para carregar os chamados do usuário logado
+    // ✅ Função para carregar chamados do usuário logado
     const carregarChamados = async () => {
       try {
         const token = auth.access
         if (!token) {
-          console.warn("⚠️ Nenhum token encontrado. Redirecionando para login...")
+          console.warn('⚠️ Nenhum token encontrado. Redirecionando para login...')
           router.push('/')
           return
         }
 
         const response = await api.get('chamados/', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
 
-        console.log("📦 Dados recebidos:", response.data)
+        console.log('📦 Dados recebidos:', response.data)
 
-        chamados.value = (response.data.results || response.data).filter(
-  (c: any) => c.creator === auth.user?.id
-)
+        const lista = response.data.results || response.data
 
+        // 🔹 Filtra chamados criados pelo usuário logado
+        chamados.value = lista
+          .filter((c: any) => c.creator?.id === auth.user?.id)
+          .map((c: any) => ({
+            id: c.id,
+            title: c.title,
+            status: c.status,
+            prioridade: c.prioridade,
+            update_date: c.update_date,
+            tecnico: c.employee ? c.employee.name : '—',
+            email: c.employee ? c.employee.email : '',
+          }))
 
-        // Se o backend retorna uma lista simples
-        chamados.value = response.data.results || response.data
-        console.log("✅ Chamados carregados:", chamados.value)
+        console.log('✅ Chamados carregados:', chamados.value)
       } catch (error: any) {
-        console.error("❌ Erro ao carregar chamados:", error.response?.data || error)
+        console.error('❌ Erro ao carregar chamados:', error.response?.data || error)
         if (error.response?.status === 401) {
-          alert("Sessão expirada. Faça login novamente.")
+          alert('Sessão expirada. Faça login novamente.')
           router.push('/')
         }
       }
     }
 
-    // ✅ Executa ao carregar a página
     onMounted(() => {
       carregarChamados()
     })
 
-    const closeProfileMenu = () => {}
+    // ✅ Ir para a página de detalhes
+    const goToChamadoDetalhado = (id: number) => {
+      router.push({ name: 'ChamadoDetalhado', params: { id } })
+    }
 
-   const goToChamadoDetalhado = (id: number) => {
-  router.push({ name: 'ChamadoDetalhado', params: { id } })
-}
-
-
-    // ✅ Filtros dinâmicos
+    // ✅ Filtro dinâmico
     const filtrados = computed(() => {
       return chamados.value.filter((c) => {
         const matchStatus =
-          filtroStatus.value === 'todos' || c.status?.toLowerCase() === filtroStatus.value.toLowerCase()
+          filtroStatus.value === 'todos' ||
+          c.status?.toLowerCase() === filtroStatus.value.toLowerCase()
         const matchPrioridade =
-          filtroPrioridade.value === 'todos' || c.prioridade?.toLowerCase() === filtroPrioridade.value.toLowerCase()
+          filtroPrioridade.value === 'todos' ||
+          c.prioridade?.toLowerCase() === filtroPrioridade.value.toLowerCase()
         const matchPesquisa =
           c.title?.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
           c.tecnico?.toLowerCase().includes(pesquisa.value.toLowerCase())
+
         return matchStatus && matchPrioridade && matchPesquisa
       })
     })
 
-    // ✅ Ordenação (recente/antigo)
+    // ✅ Ordenação (mais recente ou mais antigo)
     const chamadosOrdenados = computed(() => {
       const lista = [...filtrados.value]
       if (ordemExibicao.value === 'recente') {
-        return lista.sort((a, b) =>
-          new Date(b.update_date).getTime() - new Date(a.update_date).getTime()
+        return lista.sort(
+          (a, b) =>
+            new Date(b.update_date).getTime() -
+            new Date(a.update_date).getTime()
         )
       } else {
-        return lista.sort((a, b) =>
-          new Date(a.update_date).getTime() - new Date(b.update_date).getTime()
+        return lista.sort(
+          (a, b) =>
+            new Date(a.update_date).getTime() -
+            new Date(b.update_date).getTime()
         )
       }
     })
 
-    // ✅ Classes e ícones
+    // ✅ Classes e ícones de status e prioridade
     const statusClass = (status: string) => {
       switch (status.toLowerCase()) {
-        case 'concluído': return 'status-concluido'
-        case 'aberto': return 'status-aberto'
-        case 'aguardando_atendimento': return 'status-aguardando'
-        case 'em andamento': return 'status-andamento'
-        case 'cancelado': return 'status-cancelado'
-        default: return ''
+        case 'concluido':
+        case 'concluído':
+          return 'status-concluido'
+        case 'aberto':
+          return 'status-aberto'
+        case 'aguardando_atendimento':
+          return 'status-aguardando'
+        case 'em andamento':
+          return 'status-andamento'
+        case 'cancelado':
+          return 'status-cancelado'
+        default:
+          return ''
       }
     }
 
     const statusIcon = (status: string) => {
       switch (status.toLowerCase()) {
-        case 'concluído': return 'check_circle'
-        case 'aberto': return 'circle'
-        case 'aguardando_atendimento': return 'hourglass_top'
-        case 'em andamento': return 'autorenew'
-        case 'cancelado': return 'cancel'
-        default: return 'help_outline'
+        case 'concluido':
+        case 'concluído':
+          return 'check_circle'
+        case 'aberto':
+          return 'circle'
+        case 'aguardando_atendimento':
+          return 'hourglass_top'
+        case 'em andamento':
+          return 'autorenew'
+        case 'cancelado':
+          return 'cancel'
+        default:
+          return 'help_outline'
       }
     }
 
     const prioridadeClass = (prioridade: string) => {
       switch (prioridade.toLowerCase()) {
-        case 'alta': return 'prioridade-alta'
-        case 'media': return 'prioridade-media'
-        case 'baixa': return 'prioridade-baixa'
-        default: return ''
+        case 'alta':
+          return 'prioridade-alta'
+        case 'media':
+          return 'prioridade-media'
+        case 'baixa':
+          return 'prioridade-baixa'
+        default:
+          return ''
       }
     }
 
     const prioridadeIcon = (prioridade: string) => {
       switch (prioridade.toLowerCase()) {
-        case 'alta': return 'arrow_upward'
-        case 'media': return 'remove'
-        case 'baixa': return 'arrow_downward'
-        default: return ''
+        case 'alta':
+          return 'arrow_upward'
+        case 'media':
+          return 'remove'
+        case 'baixa':
+          return 'arrow_downward'
+        default:
+          return ''
       }
     }
 
     const formatarPrioridade = (prioridade: string) => {
       switch (prioridade.toLowerCase()) {
-        case 'alta': return 'Alta Prioridade'
-        case 'media': return 'Prioridade Média'
-        case 'baixa': return 'Baixa Prioridade'
-        default: return 'Sem Prioridade'
+        case 'alta':
+          return 'Alta Prioridade'
+        case 'media':
+          return 'Prioridade Média'
+        case 'baixa':
+          return 'Baixa Prioridade'
+        default:
+          return 'Sem Prioridade'
       }
     }
 
@@ -261,10 +295,8 @@ export default defineComponent({
       filtroPrioridade,
       ordemExibicao,
       pesquisa,
-      usuario,
       chamados,
       carregarChamados,
-      closeProfileMenu,
       goToChamadoDetalhado,
       filtrados,
       chamadosOrdenados,
@@ -272,9 +304,9 @@ export default defineComponent({
       statusIcon,
       prioridadeClass,
       prioridadeIcon,
-      formatarPrioridade
+      formatarPrioridade,
     }
-  }
+  },
 })
 </script>
 
@@ -293,8 +325,8 @@ export default defineComponent({
 
 html, body, #app {
   height: 100%;
-  width: 100%;
-  overflow: hidden;
+  width: 100%;  
+  overflow: auto;
 }
 
 /* CONTAINER PRINCIPAL - FULLSCREEN */
@@ -304,7 +336,8 @@ html, body, #app {
   width: 100vw;
   min-height: 100vh;
   min-width: 100vw;
-  overflow: hidden;
+  position: relative; /* ✅ antes era fixed */
+  overflow: auto;
   background-color: #fff;
   position: fixed;
   top: 0;

@@ -1,7 +1,7 @@
 <template>
   <div class="perfil-page">
     <!-- Sidebar como componente -->
-    <tecnico-sidebar :usuario="usuario" />
+    <tecnico-sidebar />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -138,49 +138,137 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive } from 'vue'
+import { defineComponent, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TecnicoSidebar from '@/components/layouts/tecnicoSidebar.vue'
+import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api'
 
 export default defineComponent({
-  name: 'TecnicoPerfil',
-  components: {
-    TecnicoSidebar
-  },
+  name: 'Perfil',
+  components: { TecnicoSidebar },
+
+
   setup() {
     const router = useRouter()
+    const auth = useAuthStore()
     const editMode = ref(false)
 
+    // 🔹 Estado principal do usuário
     const usuario = ref({
-      nome: 'Victor Ribeiro',
-      email: 'victor@email.com',
-      dataNascimento: '15/03/1985',
-      cpf: '987.654.321-00',
-      endereco: 'Av. Técnica, 456, São Paulo, SP',
-      tipoUsuario: 'Técnico',
-      foto: '', 
+      nome: '',
+      email: '',
+      cargo: '',
+      cpf: '',
+      ativo: '',
+      tipoUsuario: '',
+      foto: '',
     })
 
-    const usuarioEditado = reactive({ ...usuario.value })
+    // 🔹 Versão editável
+    const usuarioEditado = ref({ ...usuario.value })
 
     const defaultFoto = new URL('../../assets/images/default-avatar.png', import.meta.url).href
 
+    // ✅ Função que busca os dados do usuário logado no backend
+    const carregarDadosUsuario = async () => {
+      try {
+        const token = auth.access
+        if (!token) {
+          console.warn('⚠️ Nenhum token encontrado, redirecionando para login...')
+          router.push('/')
+          return
+        }
+
+         
+    const response = await api.get('/me/', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+        usuario.value = {
+        nome: response.data.name,
+        email: response.data.email,
+        cargo: response.data.cargo || 'Não informado',
+        cpf: response.data.cpf || '---',
+        dataNascimento: response.data.dt_nascimento || '---',
+        endereco: response.data.endereco || '---',
+        ativo: response.data.is_active ? 'Ativo' : 'Inativo',
+        tipoUsuario: response.data.is_staff ? 'Técnico' : '',
+        foto: response.data.foto_user || '',
+}
+
+
+        usuarioEditado.value = { ...usuario.value }
+        console.log('👤 Dados do usuário carregados:', usuario.value)
+      } catch (error) {
+        console.error('Erro ao carregar dados do usuário:', error.response?.data || error)
+        if (error.response?.status === 401) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+        }
+      }
+    }
+
+    // 🚀 Busca os dados assim que o componente for montado
+    onMounted(() => {
+      carregarDadosUsuario()
+    })
+
+    // 🔹 Edição local
     const enterEditMode = () => {
-      Object.assign(usuarioEditado, usuario.value)
+      usuarioEditado.value = { ...usuario.value }
       editMode.value = true
     }
 
     const cancelEdit = () => {
+      usuarioEditado.value = { ...usuario.value }
       editMode.value = false
-      Object.assign(usuarioEditado, usuario.value)
     }
 
-    const saveChanges = () => {
-      Object.assign(usuario.value, usuarioEditado)
-      editMode.value = false
-      console.log('Dados salvos:', usuario.value)
-      alert('Alterações salvas com sucesso!')
+   const saveChanges = async () => {
+  try {
+    const token = auth.access
+    if (!token) {
+      alert('Sessão expirada. Faça login novamente.')
+      router.push('/')
+      return
     }
+
+    // Monta os dados que o backend espera
+    const payload = {
+      name: usuarioEditado.value.nome,
+      email: usuarioEditado.value.email,
+      cpf: usuarioEditado.value.cpf,
+      cargo: usuarioEditado.value.cargo,
+      dt_nascimento: usuarioEditado.value.dataNascimento,
+      endereco: usuarioEditado.value.endereco,
+    }
+
+    // Faz o PUT/PATCH na API
+    const response = await api.patch('me/', payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    usuario.value = {
+      ...usuario.value,
+      nome: response.data.name,
+      email: response.data.email,
+      cpf: response.data.cpf,
+      cargo: response.data.cargo,
+      dataNascimento: response.data.dt_nascimento,
+      endereco: response.data.endereco,
+    }
+
+    editMode.value = false
+    alert('Alterações salvas com sucesso!')
+  } catch (error) {
+    console.error('Erro ao salvar alterações:', error.response?.data || error)
+    alert('Erro ao salvar alterações. Verifique os campos e tente novamente.')
+  }
+}
+
 
     const changePhoto = () => {
       const input = document.createElement('input')
@@ -189,12 +277,11 @@ export default defineComponent({
       input.onchange = (e) => {
         const target = e.target as HTMLInputElement
         if (target.files && target.files[0]) {
-          const file = target.files[0]
           const reader = new FileReader()
           reader.onload = (e) => {
-            usuarioEditado.foto = e.target?.result as string
+            usuarioEditado.value.foto = e.target?.result as string
           }
-          reader.readAsDataURL(file)
+          reader.readAsDataURL(target.files[0])
         }
       }
       input.click()
@@ -203,16 +290,15 @@ export default defineComponent({
     const changePassword = () => {
       const newPassword = prompt('Digite sua nova senha:')
       if (newPassword) {
-        console.log('Nova senha definida')
-        alert('Senha alterada com sucesso!')
+        alert('Senha alterada com sucesso! (simulação)')
       }
     }
 
     return {
       usuario,
       usuarioEditado,
-      defaultFoto,
       editMode,
+      defaultFoto,
       enterEditMode,
       cancelEdit,
       saveChanges,
@@ -222,6 +308,8 @@ export default defineComponent({
   },
 })
 </script>
+
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
@@ -333,7 +421,7 @@ html, body, #app {
   margin-bottom: 40px;
 }
 
-/* Card do Perfil - ESTILO CONSISTENTE */
+/* Card do Perfil - ESTILO CONSISTENTE COM NOVO CHAMADO */
 .card-form {
   width: 500px;
   background-color: #fff;

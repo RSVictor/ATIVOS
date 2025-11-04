@@ -20,8 +20,9 @@
       <div class="sidebar-profile" @click="toggleProfileMenu">
         <div class="profile-image">👤</div>
         <div class="profile-info">
-          <p class="profile-name">Victor Ribeiro</p>
-          <p class="profile-email">victor@email.com</p>
+          <p class="profile-name">{{ usuario.name || 'Técnico' }}</p>
+          <p class="profile-email">{{ usuario.email || 'sem@email.com' }}</p>
+
         </div>
       </div>
 
@@ -41,20 +42,28 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
+import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 
 export default defineComponent({
   name: 'TecnicoSidebar',
-  props: {
-    usuario: {
-      type: Object,
-      required: true
-    }
-  },
   setup() {
     const router = useRouter()
+    const auth = useAuthStore()
     const profileMenuOpen = ref(false)
+
+    // ✅ Computed protegido (evita erro se auth.user for undefined)
+    const usuario = computed(() => {
+      const user = auth.user
+      if (!user) {
+        return { name: 'Técnico', email: 'sem@email.com' }
+      }
+      return {
+        name: user.name || 'Técnico',
+        email: user.email || 'sem@email.com',
+      }
+    })
 
     const toggleProfileMenu = () => {
       profileMenuOpen.value = !profileMenuOpen.value
@@ -70,6 +79,7 @@ export default defineComponent({
     }
 
     const goToLogin = () => {
+      auth.logout() // opcional, se existir
       router.push('/')
       closeProfileMenu()
     }
@@ -80,9 +90,11 @@ export default defineComponent({
       closeProfileMenu,
       goToPerfil,
       goToLogin,
+      usuario
     }
-  },
+  }
 })
+
 </script>
 
 <style scoped>

@@ -1,7 +1,7 @@
 <template>
   <div class="novo-chamado-page" @click="closeProfileMenu">
     <!-- Sidebar do Cliente -->
-   <cliente-sidebar :usuario="usuario" />
+   <cliente-sidebar />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -116,7 +116,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue'
+import { defineComponent, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
 import api from '@/services/api'
@@ -130,11 +130,15 @@ export default defineComponent({
     const router = useRouter()
     const auth = useAuthStore()
 
+    // 🔹 Campos do formulário
     const titulo = ref('')
     const descricao = ref('')
     const categoria = ref('')
     const prioridade = ref('')
     const imagemURL = ref<string | null>(null)
+    const imagem = ref<File | null>(null)
+
+    // 🔹 Opções fixas
     const categorias = ref(['Manutenção', 'Suporte', 'Instalação', 'Rede', 'Software', 'Hardware'])
     const prioridades = ref([
       { value: 'alta', label: 'Alta' },
@@ -143,64 +147,67 @@ export default defineComponent({
     ])
     const maxDescricaoChars = 2830
 
-    const usuario = ref({
-      nome: auth.user?.name || 'Usuário',
-      email: auth.user?.email || 'sem@email.com'
-    })
-
-    const closeProfileMenu = () => {}
-
-      const submitChamado = async () => {
-    if (!titulo.value || !descricao.value || !categoria.value || !prioridade.value) {
-      alert("Por favor, preencha todos os campos obrigatórios!");
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append("title", titulo.value);
-      formData.append("description", descricao.value);
-      formData.append("prioridade", prioridade.value.toUpperCase());
-      formData.append("status", "AGUARDANDO_ATENDIMENTO");
-      formData.append("asset", "1"); // ⚠️ substitua pelo ID real do ativo se for dinâmico
-     
-
-      // 🔹 Adiciona a imagem se houver
-      const fileInput = document.querySelector(".file-input");
-      if (fileInput && fileInput.files.length > 0) {
-        formData.append("photo", fileInput.files[0]);
+    // ✅ Criação de um novo chamado
+    const submitChamado = async () => {
+      if (!titulo.value || !descricao.value || !categoria.value || !prioridade.value) {
+        alert('Por favor, preencha todos os campos obrigatórios!')
+        return
       }
 
-      // 🔹 Envia o FormData com o token JWT
-      const response = await api.post("/chamados/", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      try {
+        const token = auth.access
+        if (!token) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+          return
+        }
 
-      console.log("✅ Chamado criado:", response.data);
-      alert("Chamado criado com sucesso!");
-      router.push("/cliente/meus-chamados");
-    } catch (error) {
-      console.error("❌ Erro ao criar chamado:", JSON.stringify(error.response?.data, null, 2));
+        const formData = new FormData()
+        formData.append('title', titulo.value)
+        formData.append('description', descricao.value)
+        formData.append('prioridade', prioridade.value.toUpperCase())
+        formData.append('status', 'AGUARDANDO_ATENDIMENTO')
 
-      alert("Erro ao criar chamado. Verifique os campos e tente novamente.");
+        // ⚙️ Substituir por ID real do ativo (se for dinâmico)
+        formData.append('asset', '1')
+
+        if (imagem.value) {
+          formData.append('photo', imagem.value)
+        }
+
+        const response = await api.post('/chamados/', formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+
+        console.log('✅ Chamado criado:', response.data)
+        alert('Chamado criado com sucesso!')
+        router.push('/cliente/meus-chamados')
+      } catch (error: any) {
+        console.error('❌ Erro ao criar chamado:', error.response?.data || error)
+        alert('Erro ao criar chamado. Verifique os campos e tente novamente.')
+      }
     }
-  };
 
-
+    // ✅ Manipulação da imagem selecionada
     const onFileChange = (event: Event) => {
       const target = event.target as HTMLInputElement
       if (target.files && target.files[0]) {
+        imagem.value = target.files[0]
         imagemURL.value = URL.createObjectURL(target.files[0])
-        document.querySelector('.file-text')!.textContent = target.files[0].name
+        const fileText = document.querySelector('.file-text')
+        if (fileText) fileText.textContent = target.files[0].name
       } else {
+        imagem.value = null
         imagemURL.value = null
-        document.querySelector('.file-text')!.textContent = 'Nenhum arquivo escolhido'
+        const fileText = document.querySelector('.file-text')
+        if (fileText) fileText.textContent = 'Nenhum arquivo escolhido'
       }
     }
 
+    // ✅ Estilos e ícones de prioridade
     const prioridadeClass = (p: string) => {
       switch (p.toLowerCase()) {
         case 'alta': return 'prioridade-alta'
@@ -236,11 +243,9 @@ export default defineComponent({
       imagemURL,
       categorias,
       prioridades,
-      usuario,
       submitChamado,
       onFileChange,
       maxDescricaoChars,
-      closeProfileMenu,
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
@@ -248,6 +253,7 @@ export default defineComponent({
   },
 })
 </script>
+
 
 <style scoped>
 /* Mantenha todos os estilos CSS existentes da página novoChamado.vue */

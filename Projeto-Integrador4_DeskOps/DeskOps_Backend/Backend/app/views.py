@@ -257,15 +257,31 @@ class ChamadoViewSet(ModelViewSet):
     serializer_class = ChamadoSerializer
     permission_classes = [IsAuthenticated, ChamadoPermission]
 
+    @action(detail=True, methods=['patch'], url_path='atribuir')
+    def atribuir(self, request, pk=None):
+        chamado = self.get_object()
+        user = request.user
+
+        # Verifica se o usuário é técnico
+        if user.role != 'tecnico':
+            return Response({'error': 'Apenas técnicos podem se atribuir a chamados.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        # Adiciona o técnico ao campo employee (ManyToMany)
+        chamado.employee.add(user)
+        chamado.status = 'EM_ANDAMENTO'
+        chamado.save()
+
+        serializer = self.get_serializer(chamado)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def get_serializer_context(self):
         return {'request': self.request}
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'admin':
-            queryset = Chamado.objects.all()
-        elif user.role == 'tecnico':
-            queryset = Chamado.objects.filter(employee=user)
+        if user.role in ['admin', 'tecnico']:
+            queryset = Chamado.objects.all()  
         else:
             queryset = Chamado.objects.filter(creator=user)
 
