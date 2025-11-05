@@ -1,6 +1,6 @@
 <template>
   <div class="meus-chamados-page" @click="closeProfileMenu">
-    <cliente-sidebar />
+    <cliente-sidebar :usuario="usuario" />
     <main class="main-content">
       <div class="content-area">
         <h1 class="page-title">Meus Chamados</h1>
@@ -38,8 +38,13 @@
           />
         </div>
 
+        <!-- Loading State -->
+        <div v-if="carregando" class="loading">
+          Carregando chamados...
+        </div>
+
         <!-- Tabela de chamados -->
-        <div class="table-container">
+        <div v-else class="table-container">
           <table class="chamados-table">
             <thead>
               <tr>
@@ -58,24 +63,23 @@
                 @click="goToChamadoDetalhado(chamado.id)"
                 class="clickable-row"
               >
-                <td>{{ chamado.update_date  }}</td>
+                <td>{{ formatarData(chamado.update_date) }}</td>
                 <td>{{ chamado.id }}</td>
                 <td>{{ chamado.title }}</td>
                 <td>
                   <div class="tecnico-info">
-                    <p>{{ chamado.tecnico }}</p>
-                   <p class="tecnico-email">
-  {{ chamado.email || (chamado.tecnico ? chamado.tecnico.toLowerCase() + '@email.com' : 'sem-técnico') }}
-</p>
-
+                    <p>{{ getTecnicoNome(chamado) }}</p>
+                    <p class="tecnico-email">
+                      {{ getTecnicoEmail(chamado) }}
+                    </p>
                   </div>
                 </td>
                 <td>
-                  <span :class="['prioridade', prioridadeClass(chamado.prioridade)]">
+                  <span :class="['prioridade', prioridadeClass(chamado.priority || chamado.prioridade)]">
                     <span class="material-icons prioridade-icon">
-                      {{ prioridadeIcon(chamado.prioridade) }}
+                      {{ prioridadeIcon(chamado.priority || chamado.prioridade) }}
                     </span>
-                    {{ formatarPrioridade(chamado.prioridade) }}
+                    {{ formatarPrioridade(chamado.priority || chamado.prioridade) }}
                   </span>
                 </td>
                 <td>
@@ -83,8 +87,13 @@
                     <span class="material-icons status-icon">
                       {{ statusIcon(chamado.status) }}
                     </span>
-                    {{ chamado.status }}
+                    {{ formatarStatus(chamado.status) }}
                   </span>
+                </td>
+              </tr>
+              <tr v-if="chamadosOrdenados.length === 0">
+                <td colspan="6" class="no-data">
+                  Nenhum chamado encontrado
                 </td>
               </tr>
             </tbody>
@@ -100,16 +109,32 @@ import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
 import { useAuthStore } from '@/stores/authStore'
-import api from '@/services/api' // axios configurado
+import api from '@/services/api'
+
+interface Creator {
+  id: number
+  name: string
+  email: string
+  cargo: string
+  cpf: string
+}
+
+interface Tecnico {
+  id: number
+  name: string
+  email: string
+}
 
 interface Chamado {
   id: number
   title: string
   status: string
-  prioridade: string
+  priority?: string
+  prioridade?: string
   update_date: string
-  tecnico?: string
-  email?: string
+  employee?: Tecnico[] | null
+  creator?: Creator | null
+  created_by?: number
 }
 
 export default defineComponent({
@@ -120,18 +145,24 @@ export default defineComponent({
     const router = useRouter()
     const auth = useAuthStore()
 
-    // 🔽 Filtros e pesquisa
+    // Filtros
     const filtroStatus = ref('todos')
     const filtroPrioridade = ref('todos')
     const ordemExibicao = ref('recente')
     const pesquisa = ref('')
+    const carregando = ref(true)
 
-    // 📋 Lista de chamados
+    const usuario = ref({
+      nome: auth.user?.name || 'Usuário',
+      email: auth.user?.email || 'sem@email.com'
+    })
+
     const chamados = ref<Chamado[]>([])
 
-    // ✅ Função para carregar chamados do usuário logado
+    // Carrega chamados do usuário logado
     const carregarChamados = async () => {
       try {
+        carregando.value = true
         const token = auth.access
         if (!token) {
           console.warn('⚠️ Nenhum token encontrado. Redirecionando para login...')
@@ -140,33 +171,27 @@ export default defineComponent({
         }
 
         const response = await api.get('chamados/', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}` }
         })
 
-        console.log('📦 Dados recebidos:', response.data)
+        const todosChamados = response.data.results || response.data
 
-        const lista = response.data.results || response.data
+        // Filtro corrigido: suporta diferentes nomes de campo de criador
+        const meusChamados = todosChamados.filter((c: any) => {
+          const creatorId = c.creator?.id || c.creator_id || c.created_by
+          const userId = auth.user?.id
+          return creatorId === userId
+        })
 
-        // 🔹 Filtra chamados criados pelo usuário logado
-        chamados.value = lista
-          .filter((c: any) => c.creator?.id === auth.user?.id)
-          .map((c: any) => ({
-            id: c.id,
-            title: c.title,
-            status: c.status,
-            prioridade: c.prioridade,
-            update_date: c.update_date,
-            tecnico: c.employee ? c.employee.name : '—',
-            email: c.employee ? c.employee.email : '',
-          }))
-
-        console.log('✅ Chamados carregados:', chamados.value)
+        chamados.value = meusChamados
       } catch (error: any) {
         console.error('❌ Erro ao carregar chamados:', error.response?.data || error)
         if (error.response?.status === 401) {
           alert('Sessão expirada. Faça login novamente.')
           router.push('/')
         }
+      } finally {
+        carregando.value = false
       }
     }
 
@@ -174,119 +199,141 @@ export default defineComponent({
       carregarChamados()
     })
 
-    // ✅ Ir para a página de detalhes
+    const closeProfileMenu = () => {}
+
     const goToChamadoDetalhado = (id: number) => {
       router.push({ name: 'ChamadoDetalhado', params: { id } })
     }
 
-    // ✅ Filtro dinâmico
+    // Protegidas contra employee undefined
+    const getTecnicoNome = (chamado: Chamado) => {
+      if (!chamado || !Array.isArray(chamado.employee) || chamado.employee.length === 0) {
+        return 'Sem técnico'
+      }
+      return chamado.employee[0]?.name || 'Sem técnico'
+    }
+
+    const getTecnicoEmail = (chamado: Chamado) => {
+      if (!chamado || !Array.isArray(chamado.employee) || chamado.employee.length === 0) {
+        return 'sem-tecnico@email.com'
+      }
+      return chamado.employee[0]?.email || 'sem-tecnico@email.com'
+    }
+
+    const formatarData = (dataString: string) => {
+      if (!dataString) return '--/--/---- --:--'
+      const data = new Date(dataString)
+      return data.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
+    const formatarStatus = (status: string) => {
+      const s = status?.toUpperCase() || ''
+      switch (s) {
+        case 'AGUARDANDO_ATENDIMENTO': return 'Aguardando'
+        case 'EM_ANDAMENTO': return 'Em Andamento'
+        case 'CONCLUIDO': return 'Concluído'
+        case 'CANCELADO': return 'Cancelado'
+        case 'ABERTO': return 'Aberto'
+        default: return status || 'Desconhecido'
+      }
+    }
+
     const filtrados = computed(() => {
       return chamados.value.filter((c) => {
+        const statusFormatado = formatarStatus(c.status).toLowerCase()
+        const filtroStatusLower = filtroStatus.value.toLowerCase()
+
         const matchStatus =
           filtroStatus.value === 'todos' ||
-          c.status?.toLowerCase() === filtroStatus.value.toLowerCase()
+          statusFormatado === filtroStatusLower ||
+          (filtroStatusLower === 'aguardando' && statusFormatado === 'aguardando') ||
+          (filtroStatusLower === 'andamento' && statusFormatado === 'em andamento')
+
+        const prioridade = c.priority || c.prioridade || ''
         const matchPrioridade =
           filtroPrioridade.value === 'todos' ||
-          c.prioridade?.toLowerCase() === filtroPrioridade.value.toLowerCase()
+          prioridade.toLowerCase() === filtroPrioridade.value.toLowerCase()
+
+        const titulo = c.title || ''
+        const tecnicoNome = getTecnicoNome(c) || ''
         const matchPesquisa =
-          c.title?.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
-          c.tecnico?.toLowerCase().includes(pesquisa.value.toLowerCase())
+          titulo.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
+          tecnicoNome.toLowerCase().includes(pesquisa.value.toLowerCase())
 
         return matchStatus && matchPrioridade && matchPesquisa
       })
     })
 
-    // ✅ Ordenação (mais recente ou mais antigo)
     const chamadosOrdenados = computed(() => {
       const lista = [...filtrados.value]
       if (ordemExibicao.value === 'recente') {
         return lista.sort(
-          (a, b) =>
-            new Date(b.update_date).getTime() -
-            new Date(a.update_date).getTime()
+          (a, b) => new Date(b.update_date).getTime() - new Date(a.update_date).getTime()
         )
       } else {
         return lista.sort(
-          (a, b) =>
-            new Date(a.update_date).getTime() -
-            new Date(b.update_date).getTime()
+          (a, b) => new Date(a.update_date).getTime() - new Date(b.update_date).getTime()
         )
       }
     })
 
-    // ✅ Classes e ícones de status e prioridade
     const statusClass = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'concluido':
-        case 'concluído':
-          return 'status-concluido'
-        case 'aberto':
-          return 'status-aberto'
-        case 'aguardando_atendimento':
-          return 'status-aguardando'
-        case 'em andamento':
-          return 'status-andamento'
-        case 'cancelado':
-          return 'status-cancelado'
-        default:
-          return ''
+      const s = formatarStatus(status).toLowerCase()
+      switch (s) {
+        case 'concluído': return 'status-concluido'
+        case 'aberto': return 'status-aberto'
+        case 'aguardando': return 'status-aguardando'
+        case 'em andamento': return 'status-andamento'
+        case 'cancelado': return 'status-cancelado'
+        default: return ''
       }
     }
 
     const statusIcon = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'concluido':
-        case 'concluído':
-          return 'check_circle'
-        case 'aberto':
-          return 'circle'
-        case 'aguardando_atendimento':
-          return 'hourglass_top'
-        case 'em andamento':
-          return 'autorenew'
-        case 'cancelado':
-          return 'cancel'
-        default:
-          return 'help_outline'
+      const s = formatarStatus(status).toLowerCase()
+      switch (s) {
+        case 'concluído': return 'check_circle'
+        case 'aberto': return 'circle'
+        case 'aguardando': return 'hourglass_top'
+        case 'em andamento': return 'autorenew'
+        case 'cancelado': return 'cancel'
+        default: return 'help_outline'
       }
     }
 
-    const prioridadeClass = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
-        case 'alta':
-          return 'prioridade-alta'
-        case 'media':
-          return 'prioridade-media'
-        case 'baixa':
-          return 'prioridade-baixa'
-        default:
-          return ''
+    const prioridadeClass = (prioridade?: string) => {
+      const p = prioridade?.toUpperCase() || ''
+      switch (p) {
+        case 'ALTA': return 'prioridade-alta'
+        case 'MEDIA': return 'prioridade-media'
+        case 'BAIXA': return 'prioridade-baixa'
+        default: return ''
       }
     }
 
-    const prioridadeIcon = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
-        case 'alta':
-          return 'arrow_upward'
-        case 'media':
-          return 'remove'
-        case 'baixa':
-          return 'arrow_downward'
-        default:
-          return ''
+    const prioridadeIcon = (prioridade?: string) => {
+      const p = prioridade?.toUpperCase() || ''
+      switch (p) {
+        case 'ALTA': return 'arrow_upward'
+        case 'MEDIA': return 'remove'
+        case 'BAIXA': return 'arrow_downward'
+        default: return ''
       }
     }
 
-    const formatarPrioridade = (prioridade: string) => {
-      switch (prioridade.toLowerCase()) {
-        case 'alta':
-          return 'Alta Prioridade'
-        case 'media':
-          return 'Prioridade Média'
-        case 'baixa':
-          return 'Baixa Prioridade'
-        default:
-          return 'Sem Prioridade'
+    const formatarPrioridade = (prioridade?: string) => {
+      const p = prioridade?.toUpperCase() || ''
+      switch (p) {
+        case 'ALTA': return 'Alta'
+        case 'MEDIA': return 'Média'
+        case 'BAIXA': return 'Baixa'
+        default: return prioridade || 'Não definida'
       }
     }
 
@@ -295,8 +342,11 @@ export default defineComponent({
       filtroPrioridade,
       ordemExibicao,
       pesquisa,
+      usuario,
       chamados,
+      carregando,
       carregarChamados,
+      closeProfileMenu,
       goToChamadoDetalhado,
       filtrados,
       chamadosOrdenados,
@@ -305,12 +355,14 @@ export default defineComponent({
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
+      formatarData,
+      formatarStatus,
+      getTecnicoNome,
+      getTecnicoEmail
     }
-  },
+  }
 })
 </script>
-
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
@@ -325,8 +377,8 @@ export default defineComponent({
 
 html, body, #app {
   height: 100%;
-  width: 100%;  
-  overflow: auto;
+  width: 100%;
+  overflow: hidden;
 }
 
 /* CONTAINER PRINCIPAL - FULLSCREEN */
@@ -336,8 +388,7 @@ html, body, #app {
   width: 100vw;
   min-height: 100vh;
   min-width: 100vw;
-  position: relative; /* ✅ antes era fixed */
-  overflow: auto;
+  overflow: hidden;
   background-color: #fff;
   position: fixed;
   top: 0;
@@ -597,6 +648,21 @@ html, body, #app {
 
 .clickable-row:hover {
   background-color: #f8f9fa;
+}
+
+/* Loading e estados vazios */
+.loading {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: #666;
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-style: italic;
 }
 
 /* SCROLLBAR PERSONALIZADA */

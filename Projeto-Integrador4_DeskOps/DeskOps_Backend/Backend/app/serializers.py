@@ -48,17 +48,15 @@ class ChamadoSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-
     asset = serializers.PrimaryKeyRelatedField(
         queryset=Ativo.objects.all(),
         required=False
     )
-
     photo = serializers.ImageField(required=False, allow_null=True)
     creator = UserSerializer(read_only=True)
     employee = UserSerializer(read_only=True)
     employee_id = serializers.PrimaryKeyRelatedField(
-    source='employee', queryset=Users.objects.all(), write_only=True, required=False
+        source='employee', queryset=Users.objects.all(), write_only=True, required=False
     )
     ultima_acao = serializers.CharField(read_only=True)
     data_ultima_acao = serializers.DateTimeField(read_only=True)
@@ -86,15 +84,18 @@ class ChamadoSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         user = request.user if request else None
 
-         # ✅ Permite o técnico atualizar o status e se atribuir
-        if user and user.role == 'tecnico':
-            if 'employee' in self.initial_data:
-                instance.employee_id = self.initial_data.get('employee')
-            if 'status' in self.initial_data:
-                instance.status = self.initial_data.get('status')
-            instance.save()
-            return instance
+        # Atualiza campos passados no request
+        if 'employee' in self.initial_data:
+            instance.employee_id = self.initial_data.get('employee')
+        if 'status' in self.initial_data:
+            instance.status = self.initial_data.get('status')
 
+        # Atualiza demais campos automaticamente
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance  # ✅ sempre retorne a instância
 
     def create(self, validated_data):
         request = self.context.get('request')

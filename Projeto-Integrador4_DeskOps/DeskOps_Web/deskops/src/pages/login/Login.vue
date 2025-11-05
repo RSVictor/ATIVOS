@@ -51,6 +51,37 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal de Loading -->
+    <div v-if="showLoadingModal" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-content" :class="{ 'modal-visible': showLoadingModal }">
+        <div class="loading-spinner">
+          <img 
+            src="../../assets/images/iconedeskops.png" 
+            alt="Loading" 
+            class="spinner-image"
+            :class="{ rotating: showLoadingModal }"
+          />
+        </div>
+        <h3 class="loading-title">Entrando...</h3>
+        <p class="loading-subtitle">Aguarde um momento</p>
+      </div>
+    </div>
+
+    <!-- Modal de Erro -->
+    <div v-if="showErrorModal" class="modal-overlay" @click.self="closeErrorModal">
+      <div class="modal-content error-modal" :class="{ 'modal-visible': showErrorModal }">
+        <div class="error-header">
+          <h3 class="error-title">Erro</h3>
+        </div>
+        <div class="error-body">
+          <p>{{ error }}</p>
+        </div>
+        <div class="error-actions">
+          <button class="btn-error-ok" @click="closeErrorModal">OK</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -62,23 +93,40 @@ const email = ref("");
 const password = ref("");
 const error = ref("");
 const loading = ref(false);
+const showLoadingModal = ref(false);
+const showErrorModal = ref(false);
 const auth = useAuthStore(); 
 
 const handleLogin = async () => {
   error.value = "";
   loading.value = true;
+  showLoadingModal.value = true;
 
   try {
-    // o authStore já faz o redirecionamento automático
     await auth.login(email.value, password.value);
+    // O authStore já faz o redirecionamento automático
   } catch (err: any) {
     error.value =
       err?.response?.data?.detail ||
       err?.detail ||
       "E-mail ou senha incorretos.";
+    showErrorModal.value = true;
   } finally {
     loading.value = false;
+    showLoadingModal.value = false;
   }
+};
+
+const closeModal = () => {
+  // Não permite fechar o modal de loading clicando fora
+  if (!loading.value) {
+    showLoadingModal.value = false;
+  }
+};
+
+const closeErrorModal = () => {
+  showErrorModal.value = false;
+  error.value = "";
 };
 </script>
 
@@ -235,6 +283,12 @@ html, body, #app {
   transform: translateY(-2px);
 }
 
+.btn-login:disabled {
+  background-color: #666;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Container de cadastro */
 .cadastro-container {
   background-color: #fff;
@@ -281,6 +335,113 @@ html, body, #app {
   transform: translateY(-2px);
 }
 
+/* MODAIS */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.54);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fade-in 0.3s ease-out;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 50px 40px;
+  border-radius: 25px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  max-width: 450px;
+  width: 90%;
+  opacity: 0;
+  transform: scale(0.8) translateY(20px);
+  transition: all 5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-content.modal-visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.loading-spinner {
+  margin-bottom: 30px;
+}
+
+.spinner-image {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+}
+
+.rotating {
+  animation: rotate 1s linear infinite;
+}
+
+.loading-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.loading-subtitle {
+  font-size: 16px;
+  color: #666;
+  text-align: center;
+}
+
+/* Modal de Erro */
+.error-modal {
+  max-width: 400px;
+  padding: 0;
+  overflow: hidden;
+  transition: all 0.3s ease-out;
+}
+
+.error-header {
+  background-color: #fff;
+  padding: 25px 25px 0 25px;
+}
+
+.error-title {
+  font-weight: bold;
+  color: #4f46e5;
+  margin: 0;
+  font-size: 20px;
+}
+
+.error-body {
+  padding: 25px;
+  color: #333;
+  font-size: 16px;
+}
+
+.error-actions {
+  padding: 0 25px 25px 25px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-error-ok {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 10px 20px;
+  border-radius: 6px;
+  transition: background-color 0.3s ease;
+}
+
+.btn-error-ok:hover {
+  background-color: #f5f5f5;
+}
+
 /* ANIMAÇÕES */
 @keyframes fade-in {
   from { opacity: 0; }
@@ -290,6 +451,29 @@ html, body, #app {
 @keyframes slide-in-left {
   from { transform: translateX(-50px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { 
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.error-message {
+  color: #d32f2f;
+  text-align: center;
+  margin-top: 15px;
+  font-size: 14px;
 }
 
 /* RESPONSIVIDADE */
@@ -313,6 +497,16 @@ html, body, #app {
   .login-container,
   .cadastro-container {
     max-width: 90%;
+  }
+
+  .modal-content {
+    max-width: 380px;
+    padding: 40px 30px;
+  }
+
+  .spinner-image {
+    width: 140px;
+    height: 140px;
   }
 }
 
@@ -338,6 +532,25 @@ html, body, #app {
   .cadastro-container {
     padding: 15px 20px;
   }
+
+  .modal-content {
+    padding: 35px 25px;
+    max-width: 320px;
+    border-radius: 20px;
+  }
+
+  .spinner-image {
+    width: 120px;
+    height: 120px;
+  }
+
+  .loading-title {
+    font-size: 18px;
+  }
+
+  .loading-subtitle {
+    font-size: 14px;
+  }
 }
 
 /* Estilos para telas muito grandes */
@@ -350,6 +563,24 @@ html, body, #app {
   .login-container,
   .cadastro-container {
     max-width: 450px;
+  }
+
+  .modal-content {
+    max-width: 500px;
+    padding: 60px 50px;
+  }
+
+  .spinner-image {
+    width: 180px;
+    height: 180px;
+  }
+
+  .loading-title {
+    font-size: 22px;
+  }
+
+  .loading-subtitle {
+    font-size: 18px;
   }
 }
 </style>
