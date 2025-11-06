@@ -198,24 +198,32 @@ export default defineComponent({
       }
     }
 
-    // ✅ Atualizar Status
-    const atualizarStatusUsuario = async (usuario: Usuario) => {
-      try {
-        const token = auth.access
-        if (!token) return
+   // ✅ Atualizar Status
+const atualizarStatusUsuario = async (usuario: Usuario) => {
+  try {
+    const token = auth.access
+    if (!token) return
 
-        const payload = { is_active: usuario.status === 'ativo' }
+    const ativo = usuario.status === 'ativo'
 
-        await api.patch(`/usuario/${usuario.id}/alterar-status/`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        alert(`✅ Status de ${usuario.nome} alterado para ${usuario.status}`)
-      } catch (error: any) {
-        console.error('❌ Erro ao atualizar status:', error.response?.data || error)
-        alert('Erro ao atualizar status do usuário.')
-      }
+    // Ativa/desativa também o is_staff
+    const payload = {
+      is_active: ativo,
+      is_staff: ativo
     }
+
+    // ⚠️ Use o endpoint correto e formatação certa
+    await api.patch(`/usuarios/${usuario.id}/`, payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    alert(`✅ Status de ${usuario.nome} alterado para ${usuario.status}`)
+  } catch (error: any) {
+    console.error('❌ Erro ao atualizar status:', error.response?.data || error)
+    alert('Erro ao atualizar status do usuário.')
+  }
+}
+
 
     // ✅ Filtros e ordenação
     const filtrados = computed(() => {
