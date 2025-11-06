@@ -49,8 +49,8 @@ const routes: Array<RouteRecordRaw> = [
   { path: '/adm/novo-ambiente', name: 'NovoAmbiente', component: NovoAmbiente, meta: { role: 'ADM' } },
   { path: '/adm/gestao-ativos', name: 'GestaoAtivos', component: GestaoAtivos, meta: { role: 'ADM' } },
   { path: '/adm/novo-ativo', name: 'NovoAtivo', component: NovoAtivo, meta: { role: 'ADM' } },
-  { path: '/adm/detalhes-ativos', name: 'DetalhesAtivos', component: DetalhesAtivos, meta: { role: 'ADM' } },
-  { path: '/adm/detalhes-ambiente', name: 'DetalhesAmbiente', component: DetalhesAmbiente, meta: { role: 'ADM' } },
+  { path: '/adm/detalhes-ativo/:id', name: 'DetalhesAtivo', component: DetalhesAtivos, meta: { role: 'ADM' } },
+  { path: '/adm/detalhes-ambiente/:id', name: 'DetalhesAmbiente', component: DetalhesAmbiente, meta: { role: 'ADM' } },
 
   // Cliente Routes
   { path: '/cliente/chamado/:id', name: 'ChamadoDetalhado', component: ChamadoDetalhado, meta: { role: 'usuario' }, props: true, },

@@ -53,7 +53,7 @@
               <tr
                 v-for="ambiente in ambientesOrdenados"
                 :key="ambiente.id"
-                @click="verDetalhesAmbiente(ambiente.id)"
+                @click="$router.push(`/adm/detalhes-ambiente/${ambiente.id}`)"
                 class="clickable-row"
               >
                 <td>{{ ambiente.criadoEm }}</td>
@@ -133,15 +133,18 @@ export default defineComponent({
       nome: a.name,
       descricao: a.description || 'Sem descrição',
       responsavel: {
-        nome: a.employee || 'Não definido',
-        email: '---',
+        nome: a.responsible?.name || 'Não definido',
+        email: a.responsible?.email || '---',
+   
       },
+     
       criadoEm: a.created_at
         ? new Date(a.created_at).toLocaleString('pt-BR')
         : '---',
         }))
       } catch (error) {
         console.error('❌ Erro ao carregar ambientes:', error)
+         
       }
     }
 
@@ -169,11 +172,11 @@ export default defineComponent({
     })
 
     const verDetalhesAmbiente = (id: number) => {
-      router.push(`/adm/ambiente/${id}`)
+      router.push(`/adm/detalhes-ambiente/${id}`)
     }
 
     const cadastrarAmbiente = () => {
-      router.push('/adm/ambiente/cadastrar')
+      router.push('/adm/novo-ambiente')
     }
 
     const closeProfileMenu = () => {}

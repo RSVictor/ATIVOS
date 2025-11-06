@@ -288,6 +288,7 @@ export default defineComponent({
     const closeProfileMenu = () => {}
 
     return {
+      chamados,
       chamadosOrdenados,
       tecnicosUnicos,
       filtroStatus,

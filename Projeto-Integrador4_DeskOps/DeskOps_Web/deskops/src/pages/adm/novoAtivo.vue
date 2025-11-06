@@ -108,9 +108,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue'
+import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
+import api from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 
 interface Ambiente {
   id: number
@@ -120,36 +122,42 @@ interface Ambiente {
 
 export default defineComponent({
   name: 'NovoAtivo',
-  components: {
-    AdmSidebar
-  },
+  components: { AdmSidebar },
+
   setup() {
     const router = useRouter()
-    
+    const auth = useAuthStore()
+    const token = auth.access
+
     const nome = ref('')
     const descricao = ref('')
     const ambienteSelecionado = ref<number | string>('')
     const status = ref<string>('')
     const maxDescricaoChars = 400
+    const ambientes = ref<Ambiente[]>([])
 
-    const usuario = ref({
-      nome: 'Administrador',
-      email: 'admin@deskops.com',
-      dataNascimento: '10/05/1980',
-      cpf: '111.222.333-44',
-      endereco: 'Av. Principal, 1000, São Paulo, SP',
-      tipoUsuario: 'Administrador',
-      foto: '', 
+    // 🔹 Buscar ambientes reais do backend
+    const carregarAmbientes = async () => {
+      try {
+        const response = await api.get('/environment/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        const data = response.data.results || response.data
+        ambientes.value = data.map((a: any) => ({
+          id: a.id,
+          nome: a.name,
+          localizacao: a.description || 'Sem descrição'
+        }))
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar ambientes:', error.response?.data || error)
+        alert('Erro ao carregar ambientes.')
+      }
+    }
+
+    onMounted(() => {
+      carregarAmbientes()
     })
-
-    const ambientes = ref<Ambiente[]>([
-      { id: 1, nome: 'Sala de Reuniões - Matriz', localizacao: 'Andar 1' },
-      { id: 2, nome: 'Laboratório de TI', localizacao: 'Andar 2' },
-      { id: 3, nome: 'Data Center', localizacao: 'Andar Térreo' },
-      { id: 4, nome: 'Escritório - Andar 3', localizacao: 'Andar 3' },
-      { id: 5, nome: 'Sala de Treinamento', localizacao: 'Andar 2' },
-      { id: 6, nome: 'Recepção', localizacao: 'Andar Térreo' },
-    ])
 
     const descricaoLimitada = computed(() => {
       if (!descricao.value) return 'Nenhuma descrição informada'
@@ -172,54 +180,48 @@ export default defineComponent({
       }
     })
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada no clique da página para fechar o menu de perfil
+    const closeProfileMenu = () => {}
+
+    // ✅ Enviar ativo para o backend
+  const submitAtivo = async () => {
+  if (!nome.value.trim()) return alert('Informe o nome do ativo')
+  if (!descricao.value.trim()) return alert('Informe a descrição')
+  if (!ambienteSelecionado.value) return alert('Selecione um ambiente')
+  if (!status.value) return alert('Selecione um status')
+
+  // 🔹 Mapeia para o formato aceito pelo backend
+  const statusMap: Record<string, string> = {
+    ativo: 'ATIVO',
+    manutencao: 'EM_MANUTENCAO'
+  }
+
+  const ativoData = {
+    name: nome.value.trim(),
+    description: descricao.value.trim(),
+    environment_FK: Number(ambienteSelecionado.value), // 🔹 Garante número
+    status: statusMap[status.value] || 'ATIVO'
+  }
+
+  console.log('📦 Enviando ativo:', ativoData)
+
+  try {
+    const response = await api.post('/ativo/', ativoData, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    console.log('✅ Ativo cadastrado:', response.data)
+    alert('✅ Ativo cadastrado com sucesso!')
+    router.push('/adm/gestao-ativos')
+  } catch (error: any) {
+    console.error('❌ Erro ao cadastrar ativo:', error.response?.data || error)
+    if (error.response?.data) {
+      alert(`❌ Erro ao cadastrar ativo:\n${JSON.stringify(error.response.data, null, 2)}`)
+    } else {
+      alert('❌ Erro desconhecido ao cadastrar ativo.')
     }
+  }
+}
 
-    const submitAtivo = () => {
-      // Validações
-      if (!nome.value.trim()) {
-        alert('Por favor, informe o nome do ativo')
-        return
-      }
-
-      if (!descricao.value.trim()) {
-        alert('Por favor, informe a descrição do ativo')
-        return
-      }
-
-      if (!ambienteSelecionado.value) {
-        alert('Por favor, selecione um ambiente')
-        return
-      }
-
-      if (!status.value) {
-        alert('Por favor, selecione um status')
-        return
-      }
-
-      const ativoData = {
-        name: nome.value.trim(),
-        description: descricao.value.trim(),
-        environment_FK: ambienteSelecionado.value,
-        status: status.value
-        // qr_code será gerado automaticamente pelo backend
-      }
-
-      console.log('Dados do ativo:', ativoData)
-      
-      // Simular envio para API
-      alert('Ativo cadastrado com sucesso! O QR Code foi gerado automaticamente.')
-      
-      // Limpar formulário
-      nome.value = ''
-      descricao.value = ''
-      ambienteSelecionado.value = ''
-      status.value = ''
-      
-      // Redirecionar para gestão de ativos
-      router.push('/adm/gestao-ativo')
-    }
 
     return {
       nome,
@@ -227,7 +229,6 @@ export default defineComponent({
       ambienteSelecionado,
       status,
       ambientes,
-      usuario,
       maxDescricaoChars,
       descricaoLimitada,
       ambienteNome,
@@ -235,9 +236,10 @@ export default defineComponent({
       closeProfileMenu,
       submitAtivo
     }
-  },
+  }
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

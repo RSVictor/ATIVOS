@@ -1,18 +1,14 @@
 <template>
   <div class="detalhes-ativo-page" @click="closeProfileMenu">
-    <!-- Sidebar do Admin -->
     <adm-sidebar />
 
-    <!-- Conteúdo principal -->
     <main class="main-content">
       <div class="content-area">
-        <!-- Botão Voltar -->
         <div class="back-container" @click="$router.push('/adm/gestao-ativos')">
           <span class="material-icons back-icon">arrow_back</span>
           <span class="back-text">Voltar</span>
         </div>
 
-        <!-- Título com botões de editar e excluir no canto direito -->
         <div class="title-container">
           <h1 class="page-title">Detalhes do Ativo</h1>
           <div class="action-buttons-header">
@@ -27,10 +23,15 @@
           </div>
         </div>
 
-        <div class="cards-container"> 
-          <!-- Card do ativo (MAIOR) -->
+        <!-- Estado de carregamento -->
+        <div v-if="carregando" class="loading">
+          <p>Carregando ativo...</p>
+        </div>
+
+        <div v-else class="cards-container">
+          <!-- Card principal -->
           <div class="card-form">
-            <!-- Modo Visualização -->
+            <!-- VISUALIZAÇÃO -->
             <div v-if="!editando" class="view-mode">
               <div class="header-info">
                 <p class="ativo-id">#{{ ativo.id }}</p>
@@ -55,71 +56,43 @@
 
               <div class="date-info">
                 <div class="date-container left">
-                  <h3 class="date-title">Data de Criação</h3>
-                  <p class="info-text date-text">{{ ativo.criadoEm }}</p>
+                  <h3 class="date-title">Criado em</h3>
+                  <p class="info-text">{{ ativo.criadoEm }}</p>
                 </div>
                 <div class="date-container right">
-                  <h3 class="date-title">Última Atualização</h3>
-                  <p class="info-text date-text">{{ ativo.atualizadoEm }}</p>
+                  <h3 class="date-title">Atualizado em</h3>
+                  <p class="info-text">{{ ativo.atualizadoEm }}</p>
                 </div>
               </div>
             </div>
 
-            <!-- Modo Edição -->
+            <!-- EDIÇÃO -->
             <div v-else class="edit-mode">
-              <div class="header-info">
-                <p class="ativo-id">#{{ ativo.id }}</p>
-                <span :class="['status-badge', statusClass(ativo.status)]">
-                  <span class="material-icons status-icon">{{ statusIcon(ativo.status) }}</span>
-                  {{ formatarStatus(ativo.status) }}
-                </span>
-              </div>
-
               <div class="form-section">
                 <h3 class="section-title">Nome do Ativo</h3>
-                <input
-                  type="text"
-                  v-model="formEdit.nome"
-                  placeholder="Digite o nome do ativo"
-                  class="form-input"
-                />
+                <input type="text" v-model="formEdit.nome" class="form-input" />
               </div>
 
               <div class="form-section">
                 <h3 class="section-title">Descrição</h3>
-                <textarea
-                  v-model="formEdit.descricao"
-                  placeholder="Descreva o ativo"
-                  class="form-textarea"
-                  rows="4"
-                ></textarea>
+                <textarea v-model="formEdit.descricao" class="form-textarea" rows="4"></textarea>
               </div>
 
               <div class="form-section">
                 <h3 class="section-title">Ambiente</h3>
                 <select v-model="formEdit.ambiente.id" class="form-select">
-                  <option value="" disabled>Selecione o Ambiente</option>
-                  <option value="1">Sala de Reuniões 1</option>
-                  <option value="2">Laboratório de TI</option>
-                  <option value="3">Escritório Principal</option>
+                  <option value="" disabled>Selecione o ambiente</option>
+                  <option v-for="amb in ambientes" :key="amb.id" :value="amb.id">
+                    {{ amb.nome }}
+                  </option>
                 </select>
-              </div>
-
-              <div class="form-section">
-                <h3 class="section-title">Localização</h3>
-                <input
-                  type="text"
-                  v-model="formEdit.ambiente.localizacao"
-                  placeholder="Digite a localização"
-                  class="form-input"
-                />
               </div>
 
               <div class="form-section">
                 <h3 class="section-title">Status</h3>
                 <select v-model="formEdit.status" class="form-select">
-                  <option value="ativo">Ativo</option>
-                  <option value="manutencao">Em Manutenção</option>
+                  <option value="ATIVO">Ativo</option>
+                  <option value="EM_MANUTENCAO">Em Manutenção</option>
                 </select>
               </div>
 
@@ -136,20 +109,15 @@
             </div>
           </div>
 
-          <!-- Card de ações (MENOR) -->
+          <!-- Card lateral -->
           <div class="card-summary">
             <h2 class="card-title">Ações</h2>
-            
             <div class="action-buttons">
-              <button 
-                class="btn-secondary" 
-                @click="alterarStatus"
-                :disabled="editando"
-              >
+              <button class="btn-secondary" @click="alterarStatus" :disabled="editando">
                 <span class="material-icons">
-                  {{ ativo.status === 'ativo' ? 'build' : 'check_circle' }}
+                  {{ ativo.status === 'ATIVO' ? 'build' : 'check_circle' }}
                 </span>
-                {{ ativo.status === 'ativo' ? 'Colocar em Manutenção' : 'Ativar Ativo' }}
+                {{ ativo.status === 'ATIVO' ? 'Colocar em Manutenção' : 'Ativar Ativo' }}
               </button>
             </div>
 
@@ -170,7 +138,7 @@
                 <span class="info-value">{{ ativo.ambiente.localizacao }}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">ID QR Code:</span>
+                <span class="info-label">QR Code:</span>
                 <span class="info-value">{{ ativo.qrCode }}</span>
               </div>
             </div>
@@ -182,9 +150,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { defineComponent, ref, reactive, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
+import api from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 
 interface Ambiente {
   id: number
@@ -204,51 +174,74 @@ interface Ativo {
 }
 
 export default defineComponent({
-  name: 'DetalhesAtivos',
-  components: {
-    AdmSidebar
-  },
+  name: 'DetalhesAtivo',
+  components: { AdmSidebar },
+
   setup() {
     const router = useRouter()
+    const route = useRoute()
+    const auth = useAuthStore()
+    const token = auth.access
+
+    const ativo = ref<Ativo | null>(null)
+    const ambientes = ref<Ambiente[]>([])
+    const carregando = ref(true)
     const editando = ref(false)
+
     const formEdit = reactive({
       nome: '',
       descricao: '',
-      ambiente: {
-        id: 0,
-        nome: '',
-        localizacao: ''
-      },
+      ambiente: { id: 0, nome: '', localizacao: '' },
       status: ''
     })
 
-    const usuario = ref({
-      nome: 'Administrador',
-      email: 'admin@deskops.com',
-      dataNascimento: '10/05/1980',
-      cpf: '111.222.333-44',
-      endereco: 'Av. Principal, 1000, São Paulo, SP',
-      tipoUsuario: 'Administrador',
-      foto: '', 
-    })
+    const carregarAtivo = async () => {
+      try {
+        const id = route.params.id
+        const response = await api.get(`/ativo/${id}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-    const ativo = ref<Ativo>({
-      id: 3001,
-      nome: 'Notebook Dell Latitude 5420',
-      descricao: 'Notebook corporativo para desenvolvimento, equipado com 16GB RAM, SSD 512GB e processador Intel i7.',
-      ambiente: {
-        id: 2,
-        nome: 'Laboratório de TI',
-        localizacao: 'Andar 2'
-      },
-      status: 'ativo',
-      qrCode: 'QR001',
-      criadoEm: '10/10/2025 - 14:22',
-      atualizadoEm: '11/10/2025 - 09:10'
-    })
+        const data = response.data
+        ativo.value = {
+          id: data.id,
+          nome: data.name,
+          descricao: data.description || 'Sem descrição',
+          status: data.status,
+          qrCode: data.qr_code || '---',
+          criadoEm: new Date(data.created_at).toLocaleString('pt-BR'),
+          atualizadoEm: new Date(data.updated_at).toLocaleString('pt-BR'),
+          ambiente: {
+            id: data.environment_FK?.id || 0,
+            nome: data.environment_FK?.name || 'Sem ambiente',
+            localizacao: data.environment_FK?.description || '---'
+          }
+        }
+        carregando.value = false
+      } catch (error) {
+        console.error('❌ Erro ao carregar ativo:', error)
+        alert('Erro ao carregar o ativo.')
+        router.push('/adm/gestao-ativos')
+      }
+    }
+
+    const carregarAmbientes = async () => {
+      try {
+        const response = await api.get('/environment/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        ambientes.value = response.data.results?.map((a: any) => ({
+          id: a.id,
+          nome: a.name,
+          localizacao: a.description || '---',
+        })) || []
+      } catch (error) {
+        console.error('❌ Erro ao carregar ambientes:', error)
+      }
+    }
 
     const iniciarEdicao = () => {
-      // Copia os dados atuais para o formulário de edição
+      if (!ativo.value) return
       formEdit.nome = ativo.value.nome
       formEdit.descricao = ativo.value.descricao
       formEdit.ambiente = { ...ativo.value.ambiente }
@@ -256,84 +249,114 @@ export default defineComponent({
       editando.value = true
     }
 
-    const cancelarEdicao = () => {
-      editando.value = false
+    const cancelarEdicao = () => (editando.value = false)
+
+   const salvarEdicao = async () => {
+  if (!ativo.value) return
+
+  try {
+    const payload = {
+      name: formEdit.nome.trim(),
+      description: formEdit.descricao.trim(),
+      environment: Number(formEdit.ambiente.id),
+      status: formEdit.status.toUpperCase()
     }
 
-    const salvarEdicao = () => {
-      // Atualiza os dados do ativo
-      ativo.value.nome = formEdit.nome
-      ativo.value.descricao = formEdit.descricao
-      ativo.value.ambiente = { ...formEdit.ambiente }
-      ativo.value.status = formEdit.status
-      ativo.value.atualizadoEm = new Date().toLocaleString('pt-BR')
-      
-      editando.value = false
-      alert('Alterações salvas com sucesso!')
+    const response = await api.patch(`/ativo/${ativo.value.id}/`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    ativo.value = {
+      ...ativo.value,
+      nome: response.data.name,
+      descricao: response.data.description,
+      status: response.data.status,
+      atualizadoEm: new Date(response.data.updated_at).toLocaleString('pt-BR'),
+      ambiente: {
+        id: response.data.environment_FK?.id || payload.environment_FK,
+        nome: response.data.environment_FK?.name || 'Sem ambiente',
+        localizacao: response.data.environment_FK?.description || '---'
+      }
     }
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada no clique da página para fechar o menu de perfil
+    editando.value = false
+    alert('✅ Ativo atualizado com sucesso!')
+  } catch (error: any) {
+    console.error('❌ Erro ao atualizar ativo:', error.response?.data || error)
+    alert('❌ Erro ao salvar alterações. Verifique os dados.')
+  }
+}
+
+    const alterarStatus = async () => {
+      if (!ativo.value) return
+      const novoStatus = ativo.value.status === 'ATIVO' ? 'EM_MANUTENCAO' : 'ATIVO'
+      try {
+        const response = await api.patch(`/ativo/${ativo.value.id}/`, { status: novoStatus }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        ativo.value.status = response.data.status
+        ativo.value.atualizadoEm = new Date().toLocaleString('pt-BR')
+        alert(`✅ Ativo ${novoStatus === 'EM_MANUTENCAO' ? 'em manutenção' : 'reativado'} com sucesso!`)
+      } catch (error) {
+        console.error('❌ Erro ao alterar status:', error)
+        alert('Erro ao alterar status.')
+      }
+    }
+
+    const excluirAtivo = async () => {
+      if (!ativo.value) return
+      if (!confirm('Tem certeza que deseja excluir este ativo?')) return
+      try {
+        await api.delete(`/ativo/${ativo.value.id}/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        alert('🗑️ Ativo excluído com sucesso!')
+        router.push('/adm/gestao-ativos')
+      } catch (error) {
+        console.error('❌ Erro ao excluir ativo:', error)
+        alert('Erro ao excluir ativo.')
+      }
     }
 
     const statusClass = (status: string) => {
-      switch (status) {
-        case 'ativo': return 'status-ativo'
-        case 'manutencao': return 'status-manutencao'
-        default: return ''
-      }
+      return status === 'ATIVO' ? 'status-ativo' : 'status-manutencao'
     }
 
     const statusIcon = (status: string) => {
-      switch (status) {
-        case 'ativo': return 'check_circle'
-        case 'manutencao': return 'build'
-        default: return ''
-      }
+      return status === 'ATIVO' ? 'check_circle' : 'build'
     }
 
     const formatarStatus = (status: string) => {
-      switch (status) {
-        case 'ativo': return 'Ativo'
-        case 'manutencao': return 'Em Manutenção'
-        default: return status
-      }
+      return status === 'ATIVO' ? 'Ativo' : 'Em Manutenção'
     }
 
-    const alterarStatus = () => {
-      const novoStatus = ativo.value.status === 'ativo' ? 'manutencao' : 'ativo'
-      ativo.value.status = novoStatus
-      ativo.value.atualizadoEm = new Date().toLocaleString('pt-BR')
-      
-      const acao = novoStatus === 'manutencao' ? 'colocado em manutenção' : 'ativado'
-      alert(`Ativo ${acao} com sucesso!`)
-    }
+    const closeProfileMenu = () => {}
 
-    const excluirAtivo = () => {
-      if (confirm('Tem certeza que deseja excluir este ativo? Esta ação não pode ser desfeita.')) {
-        alert('Ativo excluído com sucesso!')
-        router.push('/adm/gestao-ativos')
-      }
-    }
+    onMounted(() => {
+      carregarAtivo()
+      carregarAmbientes()
+    })
 
-    return { 
+    return {
       ativo,
-      usuario,
+      ambientes,
+      carregando,
       editando,
       formEdit,
-      closeProfileMenu,
+      iniciarEdicao,
+      cancelarEdicao,
+      salvarEdicao,
+      alterarStatus,
+      excluirAtivo,
       statusClass,
       statusIcon,
       formatarStatus,
-      alterarStatus,
-      excluirAtivo,
-      iniciarEdicao,
-      cancelarEdicao,
-      salvarEdicao
+      closeProfileMenu,
     }
   },
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

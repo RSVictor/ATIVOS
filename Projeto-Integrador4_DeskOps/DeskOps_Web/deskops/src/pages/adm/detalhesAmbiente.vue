@@ -4,7 +4,7 @@
     <adm-sidebar />
 
     <!-- Conteúdo principal -->
-    <main class="main-content">
+    <main class="main-content" v-if="ambiente">
       <div class="content-area">
         <!-- Botão Voltar -->
         <div class="back-container" @click="$router.push('/adm/gestao-ambiente')">
@@ -155,13 +155,16 @@
         </div>
       </div>
     </main>
+    <p v-else class="loading-msg">Carregando ambiente...</p>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { defineComponent, ref, reactive, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
+import api from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 
 interface Responsavel {
   nome: string
@@ -179,80 +182,122 @@ interface Ambiente {
 
 export default defineComponent({
   name: 'DetalhesAmbiente',
-  components: {
-    AdmSidebar
-  },
+  components: { AdmSidebar },
   setup() {
+    const route = useRoute()
     const router = useRouter()
+    const auth = useAuthStore()
+
+    const ambiente = ref<Ambiente | null>(null)
     const editando = ref(false)
     const formEdit = reactive({
       nome: '',
       descricao: '',
-      responsavel: {
-        nome: '',
-        email: ''
+      responsavel: { nome: '', email: '' }
+    })
+
+    // ✅ Buscar ambiente pelo ID da rota
+    const carregarAmbiente = async () => {
+      try {
+        const id = route.params.id
+        const token = auth.access
+        if (!token) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+          return
+        }
+
+        const response = await api.get(`/environment/${id}/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        const a = response.data
+        ambiente.value = {
+          id: a.id,
+          nome: a.name, 
+          descricao: a.description, 
+          responsavel: {
+            nome: a.responsible?.name || '---', 
+            email: a.responsible?.email || '---' 
+          },
+          criadoEm: new Date(a.created_at).toLocaleString('pt-BR'),
+          atualizadoEm: new Date(a.updated_at).toLocaleString('pt-BR')
+        }
+
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar ambiente:', error.response?.data || error)
+        alert('Erro ao carregar detalhes do ambiente.')
       }
-    })
+    }
 
-    const usuario = ref({
-      nome: 'Administrador',
-      email: 'admin@deskops.com',
-      dataNascimento: '10/05/1980',
-      cpf: '111.222.333-44',
-      endereco: 'Av. Principal, 1000, São Paulo, SP',
-      tipoUsuario: 'Administrador',
-      foto: '', 
-    })
-
-    const ambiente = ref<Ambiente>({
-      id: 2001,
-      nome: 'Sala de Reuniões - Matriz',
-      descricao: 'Sala de reuniões principal com capacidade para 20 pessoas, equipada com projetor e sistema de videoconferência.',
-      responsavel: { 
-        nome: 'Lucas Santino', 
-        email: 'lucas@email.com' 
-      },
-      criadoEm: '11/10/2025 10:30',
-      atualizadoEm: '11/10/2025 10:30'
+    onMounted(() => {
+      carregarAmbiente()
     })
 
     const iniciarEdicao = () => {
-      // Copia os dados atuais para o formulário de edição
+      if (!ambiente.value) return
       formEdit.nome = ambiente.value.nome
       formEdit.descricao = ambiente.value.descricao
       formEdit.responsavel = { ...ambiente.value.responsavel }
       editando.value = true
     }
 
-    const cancelarEdicao = () => {
-      editando.value = false
-    }
+    const cancelarEdicao = () => { editando.value = false }
 
-    const salvarEdicao = () => {
-      // Atualiza os dados do ambiente
-      ambiente.value.nome = formEdit.nome
-      ambiente.value.descricao = formEdit.descricao
-      ambiente.value.responsavel = { ...formEdit.responsavel }
-      ambiente.value.atualizadoEm = new Date().toLocaleString('pt-BR')
-      
-      editando.value = false
-      alert('Alterações salvas com sucesso!')
-    }
+    const salvarEdicao = async () => {
+      try {
+        if (!ambiente.value) return
+        const token = auth.access
+        await api.patch(`/environment/${ambiente.value.id}/`, {
+          name: formEdit.nome,
+          description: formEdit.descricao,
+          responsible: {
+            name: formEdit.responsavel.nome,
+            email: formEdit.responsavel.email
+          }
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada no clique da página para fechar o menu de perfil
-    }
-
-    const excluirAmbiente = () => {
-      if (confirm('Tem certeza que deseja excluir este ambiente? Esta ação não pode ser desfeita.')) {
-        alert('Ambiente excluído com sucesso!')
-        router.push('/adm/gestao-ambientes')
+        ambiente.value.nome = formEdit.nome
+        ambiente.value.descricao = formEdit.descricao
+        ambiente.value.atualizadoEm = new Date().toLocaleString('pt-BR')
+        editando.value = false
+        alert('✅ Alterações salvas com sucesso!')
+      } catch (error: any) {
+        console.error('❌ Erro ao salvar ambiente:', error.response?.data || error)
+        alert('Erro ao salvar alterações.')
       }
     }
 
-    return { 
+    const excluirAmbiente = async () => {
+      if (!ambiente.value) return
+      if (confirm('Tem certeza que deseja excluir este ambiente?')) {
+        try {
+          const token = auth.access
+          await api.delete(`/environment/${ambiente.value.id}/`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          alert('🗑️ Ambiente excluído com sucesso!')
+          router.push('/adm/gestao-ambientes')
+        } catch (error: any) {
+          console.error('❌ Erro ao excluir ambiente:', error.response?.data || error)
+          if (error.response?.status === 404) {
+            alert('❌ Este ambiente não existe mais (foi excluído).')
+            router.push('/adm/gestao-ambientes') // ✅ volta pra lista automaticamente
+            return
+  }
+
+  alert('Erro ao carregar detalhes do ambiente.')
+}
+        }
+      }
+    
+
+    const closeProfileMenu = () => {}
+
+    return {
       ambiente,
-      usuario,
       editando,
       formEdit,
       closeProfileMenu,
@@ -261,9 +306,10 @@ export default defineComponent({
       cancelarEdicao,
       salvarEdicao
     }
-  },
+  }
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

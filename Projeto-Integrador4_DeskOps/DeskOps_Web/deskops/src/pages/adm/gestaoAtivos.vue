@@ -52,20 +52,21 @@
             </thead>
             <tbody>
               <tr
-                v-for="ativo in ativosFiltradosOrdenados"
-                :key="ativo.id"
-                class="clickable-row"
-              >
-                <td>{{ ativo.id }}</td>
-                <td>{{ ativo.nome }}</td>
-                <td>{{ ativo.descricao }}</td>
-                <td>{{ ativo.ambiente.nome }}</td>
-                <td>
-                  <span :class="['status', statusClass(ativo.status)]">
-                    {{ formatarStatus(ativo.status) }}
-                  </span>
-                </td>
-              </tr>
+              v-for="ativo in ativosFiltradosOrdenados"
+              :key="ativo.id"
+              class="clickable-row"
+              @click="verDetalhesAtivo(ativo.id)"
+            >
+              <td>{{ ativo.id }}</td>
+              <td>{{ ativo.nome }}</td>
+              <td>{{ ativo.descricao }}</td>
+              <td>{{ ativo.ambiente.nome }}</td>
+              <td>
+                <span :class="['status', statusClass(ativo.status)]">
+                  {{ formatarStatus(ativo.status) }}
+                </span>
+              </td>
+            </tr>
             </tbody>
           </table>
         </div>
@@ -76,6 +77,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router' // ✅ IMPORTANTE
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
@@ -99,6 +101,7 @@ export default defineComponent({
 
   setup() {
     const auth = useAuthStore()
+    const router = useRouter()
     const token = auth.access
 
     const ativos = ref<Ativo[]>([])
@@ -142,18 +145,21 @@ export default defineComponent({
         const response = await api.get('/environment/', {
           headers: { Authorization: `Bearer ${token}` },
         })
-        ambientes.value = Array.isArray(response.data)
+
+        const data = Array.isArray(response.data)
           ? response.data
-          : response.data.results.map((a: any) => ({
-              id: a.id,
-              nome: a.name,
-            }))
+          : response.data.results
+
+        ambientes.value = data.map((a: any) => ({
+          id: a.id,
+          nome: a.name,
+        }))
       } catch (error) {
         console.error('❌ Erro ao carregar ambientes:', error)
       }
     }
 
-    // 🔹 Filtros
+    // 🔹 Filtragem
     const ativosFiltrados = computed(() => {
       return ativos.value.filter((a) => {
         const matchStatus =
@@ -173,9 +179,17 @@ export default defineComponent({
       [...ativosFiltrados.value].sort((a, b) => a.nome.localeCompare(b.nome))
     )
 
+    // ✅ Redirecionar para o cadastro
     const cadastrarAtivo = () => {
-      console.log('📦 Redirecionar para cadastro de ativo...')
+      router.push('/adm/novo-ativo')
     }
+
+   const verDetalhesAtivo = (id: number) => {
+  router.push(`/adm/detalhes-ativo/${id}`)
+}
+
+
+
 
     const closeProfileMenu = () => {}
 
@@ -198,6 +212,7 @@ export default defineComponent({
       pesquisa,
       ativosFiltradosOrdenados,
       cadastrarAtivo,
+      verDetalhesAtivo,      
       closeProfileMenu,
       statusClass,
       formatarStatus,
@@ -205,6 +220,7 @@ export default defineComponent({
   },
 })
 </script>
+
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 

@@ -93,6 +93,8 @@
 import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
+import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api' // ✅ garante a conexão com o backend
 
 interface Funcionario {
   id: number
@@ -102,36 +104,37 @@ interface Funcionario {
 
 export default defineComponent({
   name: 'NovoAmbiente',
-  components: {
-    AdmSidebar
-  },
+  components: { AdmSidebar },
   setup() {
     const router = useRouter()
-    
+    const auth = useAuthStore()
+
     const nome = ref('')
     const descricao = ref('')
     const funcionarioResponsavel = ref<number | string>('')
+    const funcionarios = ref<Funcionario[]>([])
     const maxDescricaoChars = 400
 
-    const usuario = ref({
-      nome: 'Administrador',
-      email: 'admin@deskops.com',
-      dataNascimento: '10/05/1980',
-      cpf: '111.222.333-44',
-      endereco: 'Av. Principal, 1000, São Paulo, SP',
-      tipoUsuario: 'Administrador',
-      foto: '', 
-    })
+    // ✅ Buscar lista de funcionários do backend
+    const carregarFuncionarios = async () => {
+      try {
+        const token = auth.access
+        const response = await api.get('/usuarios/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        // Adapta o formato para seu front
+        funcionarios.value = response.data.map((f: any) => ({
+          id: f.id,
+          nome: f.name,
+          email: f.email
+        }))
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar funcionários:', error)
+        alert('Erro ao carregar lista de funcionários.')
+      }
+    }
 
-    const funcionarios = ref<Funcionario[]>([
-      { id: 1, nome: 'Lucas Santino', email: 'lucas@email.com' },
-      { id: 2, nome: 'Maria Silva', email: 'maria@email.com' },
-      { id: 3, nome: 'Victor Ribeiro', email: 'victor@email.com' },
-      { id: 4, nome: 'Carlos Santos', email: 'carlos@email.com' },
-      { id: 5, nome: 'Ana Oliveira', email: 'ana@email.com' },
-      { id: 6, nome: 'Pedro Costa', email: 'pedro@email.com' },
-    ])
-
+    // Computeds para resumo
     const descricaoLimitada = computed(() => {
       if (!descricao.value) return 'Nenhuma descrição informada'
       return descricao.value.length > 100
@@ -141,61 +144,75 @@ export default defineComponent({
 
     const funcionarioResponsavelNome = computed(() => {
       if (!funcionarioResponsavel.value) return 'Nenhum responsável'
-      const funcionario = funcionarios.value.find(f => f.id === funcionarioResponsavel.value)
-      return funcionario ? `${funcionario.nome} - ${funcionario.email}` : 'Nenhum responsável'
+      const f = funcionarios.value.find(f => f.id === funcionarioResponsavel.value)
+      return f ? `${f.nome} - ${f.email}` : 'Nenhum responsável'
     })
 
-    const closeProfileMenu = () => {
-      // Esta função será chamada no clique da página para fechar o menu de perfil
-    }
+    const closeProfileMenu = () => {}
 
-    const submitAmbiente = () => {
-      // Validações
+    // ✅ Enviar dados reais para a API
+    const submitAmbiente = async () => {
       if (!nome.value.trim()) {
-        alert('Por favor, informe o nome do ambiente')
+        alert('Por favor, informe o nome do ambiente.')
+        return
+      }
+      if (!descricao.value.trim()) {
+        alert('Por favor, informe a descrição do ambiente.')
         return
       }
 
-      if (!descricao.value.trim()) {
-        alert('Por favor, informe a descrição do ambiente')
+      const token = auth.access
+      if (!token) {
+        alert('Sessão expirada. Faça login novamente.')
+        router.push('/')
         return
       }
 
       const ambienteData = {
         name: nome.value.trim(),
         description: descricao.value.trim(),
-        employee: funcionarioResponsavel.value || null
+        employee: funcionarioResponsavel.value || null // o ID do responsável
       }
 
-      console.log('Dados do ambiente:', ambienteData)
-      
-      // Simular envio para API
-      alert('Ambiente cadastrado com sucesso!')
-      
-      // Limpar formulário
-      nome.value = ''
-      descricao.value = ''
-      funcionarioResponsavel.value = ''
-      
-      // Redirecionar para gestão de ambientes
-      router.push('/adm/gestao-ambiente')
+      try {
+        const response = await api.post('/environment/', ambienteData, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        console.log('✅ Ambiente cadastrado:', response.data)
+        alert('✅ Ambiente cadastrado com sucesso!')
+
+        // Limpa os campos
+        nome.value = ''
+        descricao.value = ''
+        funcionarioResponsavel.value = ''
+
+        // Redireciona de volta
+        router.push('/adm/gestao-ambiente')
+      } catch (error: any) {
+        console.error('❌ Erro ao cadastrar ambiente:', error.response?.data || error)
+        alert('Erro ao cadastrar ambiente. Verifique os dados e tente novamente.')
+      }
     }
+
+    // Carrega a lista de funcionários ao montar
+    carregarFuncionarios()
 
     return {
       nome,
       descricao,
       funcionarioResponsavel,
       funcionarios,
-      usuario,
-      maxDescricaoChars,
       descricaoLimitada,
       funcionarioResponsavelNome,
+      maxDescricaoChars,
       closeProfileMenu,
       submitAmbiente
     }
   },
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
