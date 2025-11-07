@@ -42,7 +42,7 @@
               <div class="form-section profile-section">
                 <div class="profile-header">
                   <div class="foto-container">
-                    <img :src="usuario.foto || defaultFoto" alt="Foto do usuário" class="perfil-foto" />
+                    <img :src="(editMode ? usuarioEditado.foto : usuario.foto) || defaultFoto" alt="Foto do ausuario" class="perfil-foto"/>
                     <button v-if="editMode" class="change-photo-btn" @click="changePhoto">
                       <span class="material-icons">photo_camera</span>
                     </button>
@@ -168,10 +168,11 @@ export default defineComponent({
 
     // 🔹 Versão temporária para edição
     const usuarioEditado = ref({ ...usuario.value })
+    const selectedPhotoFile = ref<File | null>(null)
 
     const defaultFoto = new URL('../../assets/images/default-avatar.png', import.meta.url).href
 
-    // ✅ Função: carrega dados do usuário autenticado
+    // ✅ Carregar dados do usuário autenticado
     const carregarDadosUsuario = async () => {
       try {
         const token = auth.access
@@ -199,6 +200,10 @@ export default defineComponent({
         }
 
         usuarioEditado.value = { ...usuario.value }
+
+        // 🔹 Atualiza o Pinia (para refletir no sidebar também)
+        auth.user = data
+
         console.log('👤 Dados do usuário carregados:', usuario.value)
       } catch (error: any) {
         console.error('❌ Erro ao carregar dados do usuário:', error.response?.data || error)
@@ -209,24 +214,23 @@ export default defineComponent({
       }
     }
 
-    // 🚀 Carregar ao montar componente
     onMounted(() => {
       carregarDadosUsuario()
     })
 
-    // 🔹 Entrar no modo de edição
+    // 🟢 Entrar no modo de edição
     const enterEditMode = () => {
       usuarioEditado.value = { ...usuario.value }
       editMode.value = true
     }
 
-    // 🔹 Cancelar edição
+    // 🟢 Cancelar edição
     const cancelEdit = () => {
       usuarioEditado.value = { ...usuario.value }
       editMode.value = false
     }
 
-    // 🔹 Salvar alterações
+    // 🟢 Salvar alterações (com foto)
     const saveChanges = async () => {
       try {
         const token = auth.access
@@ -236,19 +240,27 @@ export default defineComponent({
           return
         }
 
-        const payload = {
-          name: usuarioEditado.value.nome,
-          email: usuarioEditado.value.email,
-          cpf: usuarioEditado.value.cpf,
-          cargo: usuarioEditado.value.cargo,
-          dt_nascimento: usuarioEditado.value.dataNascimento,
-          endereco: usuarioEditado.value.endereco,
+        // 🔹 Envia tudo com FormData (texto + foto)
+        const formData = new FormData()
+        formData.append('name', usuarioEditado.value.nome)
+        formData.append('email', usuarioEditado.value.email)
+        formData.append('cpf', usuarioEditado.value.cpf)
+        formData.append('cargo', usuarioEditado.value.cargo)
+        formData.append('dt_nascimento', usuarioEditado.value.dataNascimento)
+        formData.append('endereco', usuarioEditado.value.endereco)
+
+        if (selectedPhotoFile.value) {
+          formData.append('foto_user', selectedPhotoFile.value)
         }
 
-        const response = await api.patch('/me/', payload, {
-          headers: { Authorization: `Bearer ${token}` },
+        const response = await api.patch('/me/', formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
         })
 
+        // 🔹 Atualiza os dados locais e globais (Pinia)
         usuario.value = {
           ...usuario.value,
           nome: response.data.name,
@@ -257,7 +269,10 @@ export default defineComponent({
           cargo: response.data.cargo,
           dataNascimento: response.data.dt_nascimento,
           endereco: response.data.endereco,
+          foto: response.data.foto_user || usuarioEditado.value.foto,
         }
+
+        auth.user = response.data // 🔹 Atualiza o sidebar também
 
         editMode.value = false
         alert('✅ Alterações salvas com sucesso!')
@@ -267,7 +282,7 @@ export default defineComponent({
       }
     }
 
-    // 🔹 Trocar foto de perfil
+    // 🟢 Trocar foto de perfil
     const changePhoto = () => {
       const input = document.createElement('input')
       input.type = 'file'
@@ -275,17 +290,21 @@ export default defineComponent({
       input.onchange = (e) => {
         const target = e.target as HTMLInputElement
         if (target.files && target.files[0]) {
+          const file = target.files[0]
+          selectedPhotoFile.value = file // guarda o arquivo real
+
+          // Pré-visualização
           const reader = new FileReader()
           reader.onload = (e) => {
             usuarioEditado.value.foto = e.target?.result as string
           }
-          reader.readAsDataURL(target.files[0])
+          reader.readAsDataURL(file)
         }
       }
       input.click()
     }
 
-    // 🔹 Trocar senha (simulação)
+    // 🟢 Trocar senha (simulação)
     const changePassword = () => {
       const newPassword = prompt('Digite sua nova senha:')
       if (newPassword) {

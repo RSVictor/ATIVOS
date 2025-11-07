@@ -14,7 +14,7 @@
           <div class="metric-card clickable" @click="navigateTo('/adm/gestao-chamado')">
             <div class="metric-header">
               <span class="material-icons metric-icon status-aberto">circle</span>
-              <h3 class="metric-title">Chamados Abertos</h3>
+              <h3 class="metric-title">Chamados Total</h3>
             </div>
             <div class="metric-value">{{ metrics.chamadosAbertos }}</div>
             <div class="metric-trend positive">
@@ -187,8 +187,8 @@ const carregarDados = async () => {
     })
 
     const chamados = chamadosResp.data.results || chamadosResp.data
-    metrics.value.chamadosAbertos = chamados.filter(c => c.status?.toLowerCase().includes('aberto')).length
-    metrics.value.chamadosConcluidos = chamados.filter(c => c.status?.toLowerCase().includes('concl')).length
+    metrics.value.chamadosAbertos = chamados.length
+    metrics.value.chamadosConcluidos  = chamados.filter(c => c.status?.toLowerCase().includes('conclu')).length
     metrics.value.chamadosAguardando = chamados.filter(c => c.status?.toLowerCase().includes('aguard')).length
     metrics.value.chamadosAndamento = chamados.filter(c => c.status?.toLowerCase().includes('andamento')).length
     metrics.value.chamadosCancelados = chamados.filter(c => c.status?.toLowerCase().includes('cancel')).length

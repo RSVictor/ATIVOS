@@ -41,6 +41,11 @@
               <p class="info-text">{{ chamado.categoria }}</p>
             </div>
 
+               <div class="info-section">
+              <h3>Ambiente</h3>
+              <p class="info-text">{{ chamado.ambiente  }}</p>
+            </div>
+
             <div class="info-section">
               <h3>Prioridade</h3>
               <span :class="['prioridade-badge', prioridadeClass(chamado.prioridade)]">
@@ -172,6 +177,8 @@ export default defineComponent({
       imagem: null,
       status: '',
       prioridade: '',
+      categorias: '',
+      ambiente: '---',
       criadoEm: '',
       atualizadoEm: '',
       criadoPor: { nome: '', email: '' },
@@ -230,7 +237,8 @@ export default defineComponent({
       id: data.id,
       titulo: data.title || 'Sem título',
       descricao: data.description || '---',
-      categoria: data.environment || '---',
+      categoria: data.categoria || '---',
+      ambiente: data.environment?.name || '---',
       imagem: data.photo || null,
       status: data.status || '---',
       prioridade: data.prioridade || '---',

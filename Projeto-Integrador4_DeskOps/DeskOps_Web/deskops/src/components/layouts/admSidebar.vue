@@ -30,9 +30,18 @@
     </nav>
 
     <!-- Perfil -->
-    <div class="profile-container" ref="profileContainer" @click.stop>
-      <div class="sidebar-profile" @click="toggleProfileMenu">
-        <div class="profile-image">👤</div>
+        <div class="profile-container" ref="profileContainer" @click.stop>
+          <div class="sidebar-profile" @click="toggleProfileMenu">
+            <div class="profile-image">
+      <img
+        v-if="usuario.foto"
+        :src="usuario.foto"
+        alt="Foto de perfil"
+        class="user-photo"
+      />
+   
+    </div>
+
         <div class="profile-info">
           <p class="profile-name">{{ usuario.nome }}</p>
           <p class="profile-email">{{ usuario.email }}</p>
@@ -55,9 +64,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue'
+import { defineComponent, ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api'
 
 export default defineComponent({
   name: 'AdmSidebar',
@@ -65,15 +75,39 @@ export default defineComponent({
     const router = useRouter()
     const auth = useAuthStore()
     const profileMenuOpen = ref(false)
+    const defaultFoto = new URL('@/assets/images/default-avatar.png', import.meta.url).href
 
+    // 👤 Dados do usuário logado vindos do Pinia
     const usuario = computed(() => {
       const user = auth.user
-      if (!user) return { nome: 'Administrador', email: 'admin@deskops.com' }
+      if (!user) {
+        return {
+          nome: 'Administrador',
+          email: 'admin@deskops.com',
+          foto: ''
+        }
+      }
       return {
         nome: user.name || 'Administrador',
-        email: user.email || 'admin@deskops.com'
+        email: user.email || 'admin@deskops.com',
+        foto: user.foto_user || ''
       }
     })
+
+    // 🔄 Atualiza os dados ao carregar o sidebar
+    const carregarUsuario = async () => {
+      try {
+        const token = auth.access
+        if (!token) return
+        const response = await api.get('/me/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        // Atualiza o estado global no Pinia
+        auth.user = response.data
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados do usuário no sidebar:', error)
+      }
+    }
 
     const toggleProfileMenu = () => (profileMenuOpen.value = !profileMenuOpen.value)
     const closeProfileMenu = () => (profileMenuOpen.value = false)
@@ -97,8 +131,14 @@ export default defineComponent({
       }
     }
 
-    const initialize = () => document.addEventListener('click', handleClickOutside)
-    const cleanup = () => document.removeEventListener('click', handleClickOutside)
+    onMounted(() => {
+      carregarUsuario()
+      document.addEventListener('click', handleClickOutside)
+    })
+
+    onBeforeUnmount(() => {
+      document.removeEventListener('click', handleClickOutside)
+    })
 
     return {
       usuario,
@@ -107,18 +147,12 @@ export default defineComponent({
       closeProfileMenu,
       goToPerfil,
       goToLogin,
-      initialize,
-      cleanup
+      defaultFoto
     }
-  },
-  mounted() {
-    this.initialize()
-  },
-  beforeUnmount() {
-    this.cleanup()
   }
 })
 </script>
+
 
 
 <style scoped>
@@ -202,6 +236,14 @@ export default defineComponent({
   padding: 10px 12px;
   border-radius: 8px;
   transition: background-color 0.2s;
+}
+
+.user-photo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #93bfa7;
 }
 
 .sidebar-profile:hover {

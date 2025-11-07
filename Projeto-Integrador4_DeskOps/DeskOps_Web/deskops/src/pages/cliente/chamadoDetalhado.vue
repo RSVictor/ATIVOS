@@ -153,7 +153,7 @@ export default defineComponent({
           id: data.id,
           titulo: data.title,
           descricao: data.description,
-          ambiente: data.environment || '---',
+          ambiente: data.environment?.name || '---',
           imagem: data.photo || null,
           status: data.status,
           prioridade: data.prioridade,

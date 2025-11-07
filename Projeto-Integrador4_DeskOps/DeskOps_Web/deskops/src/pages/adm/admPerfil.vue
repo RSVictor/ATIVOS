@@ -37,7 +37,7 @@
               <div class="form-section profile-section">
                 <div class="profile-header">
                   <div class="foto-container">
-                    <img :src="usuario.foto || defaultFoto" alt="Foto do administrador" class="perfil-foto" />
+                    <img :src="(editMode ? usuarioEditado.foto : usuario.foto) || defaultFoto" alt="Foto do administrador" class="perfil-foto"/>
                     <button v-if="editMode" class="change-photo-btn" @click="changePhoto">
                       <span class="material-icons">photo_camera</span>
                     </button>
@@ -211,62 +211,76 @@ export default defineComponent({
       editMode.value = false
     }
 
-    // 🟢 Salvar alterações
     const saveChanges = async () => {
-      try {
-        const token = auth.access
-        if (!token) {
-          alert('Sessão expirada. Faça login novamente.')
-          router.push('/')
-          return
-        }
-
-        const payload = {
-          name: usuarioEditado.value.nome,
-          email: usuarioEditado.value.email,
-          cpf: usuarioEditado.value.cpf,
-          dt_nascimento: usuarioEditado.value.dataNascimento,
-          endereco: usuarioEditado.value.endereco,
-        }
-
-        const response = await api.patch('/me/', payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        usuario.value = {
-          ...usuario.value,
-          nome: response.data.name,
-          email: response.data.email,
-          cpf: response.data.cpf,
-          dataNascimento: response.data.dt_nascimento,
-          endereco: response.data.endereco,
-        }
-
-        editMode.value = false
-        alert('✅ Alterações salvas com sucesso!')
-      } catch (error: any) {
-        console.error('❌ Erro ao salvar alterações:', error.response?.data || error)
-        alert('Erro ao salvar alterações. Verifique os campos e tente novamente.')
-      }
+  try {
+    const token = auth.access
+    if (!token) {
+      alert('Sessão expirada. Faça login novamente.')
+      router.push('/')
+      return
     }
 
-    // 🟢 Trocar foto de perfil
-    const changePhoto = () => {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = 'image/*'
-      input.onchange = (e) => {
-        const target = e.target as HTMLInputElement
-        if (target.files && target.files[0]) {
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            usuarioEditado.value.foto = e.target?.result as string
-          }
-          reader.readAsDataURL(target.files[0])
-        }
-      }
-      input.click()
+    // 🔹 Criar o FormData para enviar texto + arquivo
+    const formData = new FormData()
+    formData.append('name', usuarioEditado.value.nome)
+    formData.append('email', usuarioEditado.value.email)
+    formData.append('cpf', usuarioEditado.value.cpf)
+    formData.append('dt_nascimento', usuarioEditado.value.dataNascimento)
+    formData.append('endereco', usuarioEditado.value.endereco)
+
+    if (selectedPhotoFile.value) {
+      formData.append('foto_user', selectedPhotoFile.value)
     }
+
+    const response = await api.patch('/me/', formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    // Atualiza dados na tela
+    usuario.value = {
+      ...usuario.value,
+      nome: response.data.name,
+      email: response.data.email,
+      cpf: response.data.cpf,
+      dataNascimento: response.data.dt_nascimento,
+      endereco: response.data.endereco,
+      foto: response.data.foto_user || usuarioEditado.value.foto, // 👈 Atualiza foto
+    }
+
+    editMode.value = false
+    alert('✅ Alterações salvas com sucesso!')
+  } catch (error: any) {
+    console.error('❌ Erro ao salvar alterações:', error.response?.data || error)
+    alert('Erro ao salvar alterações. Verifique os campos e tente novamente.')
+  }
+}
+
+
+    const selectedPhotoFile = ref<File | null>(null)
+
+const changePhoto = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = (e) => {
+    const target = e.target as HTMLInputElement
+    if (target.files && target.files[0]) {
+      const file = target.files[0]
+      selectedPhotoFile.value = file // 🔹 Guarda o arquivo real
+
+      // Exibe prévia da imagem
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        usuarioEditado.value.foto = e.target?.result as string
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+  input.click()
+}
 
     // 🟢 Alterar senha (simulação)
     const changePassword = () => {

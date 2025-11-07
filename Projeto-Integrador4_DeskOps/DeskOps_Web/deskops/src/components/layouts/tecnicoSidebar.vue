@@ -15,18 +15,26 @@
       </router-link>
     </nav>
 
-    <!-- Perfil -->
-    <div class="profile-container" ref="profileContainer" @click.stop>
-      <div class="sidebar-profile" @click="toggleProfileMenu">
-        <div class="profile-image">👤</div>
-        <div class="profile-info">
-          <p class="profile-name">{{ usuario.name || 'Técnico' }}</p>
-          <p class="profile-email">{{ usuario.email || 'sem@email.com' }}</p>
+     <!-- Perfil -->
+        <div class="profile-container" ref="profileContainer" @click.stop>
+          <div class="sidebar-profile" @click="toggleProfileMenu">
+            <div class="profile-image">
+      <img
+        v-if="usuario.foto"
+        :src="usuario.foto"
+        alt="Foto de perfil"
+        class="user-photo"
+      />
+   
+    </div>
 
+        <div class="profile-info">
+          <p class="profile-name">{{ usuario.name }}</p>
+          <p class="profile-email">{{ usuario.email }}</p>
         </div>
       </div>
 
-      <!-- Dropdown corrigido -->
+      <!-- Dropdown -->
       <transition name="slide-right">
         <div v-if="profileMenuOpen" class="profile-dropdown-right">
           <div class="dropdown-item" @click="goToPerfil">
@@ -45,6 +53,7 @@
 import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api'
 
 export default defineComponent({
   name: 'TecnicoSidebar',
@@ -52,16 +61,18 @@ export default defineComponent({
     const router = useRouter()
     const auth = useAuthStore()
     const profileMenuOpen = ref(false)
+    const defaultFoto = new URL('@/assets/images/default-avatar.png', import.meta.url).href
 
     // ✅ Computed protegido (evita erro se auth.user for undefined)
     const usuario = computed(() => {
       const user = auth.user
       if (!user) {
-        return { name: 'Técnico', email: 'sem@email.com' }
+        return { name: 'Técnico', email: 'sem@email.com', foto: '' }
       }
       return {
         name: user.name || 'Técnico',
         email: user.email || 'sem@email.com',
+        foto: user.foto_user || ''
       }
     })
 
@@ -90,7 +101,8 @@ export default defineComponent({
       closeProfileMenu,
       goToPerfil,
       goToLogin,
-      usuario
+      usuario,
+      defaultFoto
     }
   }
 })
@@ -123,6 +135,13 @@ export default defineComponent({
   text-align: left;
   margin-bottom: 30px;
   padding: 0 10px;
+}
+.user-photo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #93bfa7;
 }
 
 .logo-image {

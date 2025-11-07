@@ -42,7 +42,7 @@
               <div class="form-section profile-section">
                 <div class="profile-header">
                   <div class="foto-container">
-                    <img :src="usuario.foto || defaultFoto" alt="Foto do usuário" class="perfil-foto" />
+                    <img :src="(editMode ? usuarioEditado.foto : usuario.foto) || defaultFoto" alt="Foto do tecnico" class="perfil-foto"/>
                     <button v-if="editMode" class="change-photo-btn" @click="changePhoto">
                       <span class="material-icons">photo_camera</span>
                     </button>
@@ -145,65 +145,66 @@ import { useAuthStore } from '@/stores/authStore'
 import api from '@/services/api'
 
 export default defineComponent({
-  name: 'Perfil',
+  name: 'PerfilTecnico',
   components: { TecnicoSidebar },
-
 
   setup() {
     const router = useRouter()
     const auth = useAuthStore()
     const editMode = ref(false)
 
-    // 🔹 Estado principal do usuário
+    // 🔹 Estado principal do técnico
     const usuario = ref({
       nome: '',
       email: '',
       cargo: '',
       cpf: '',
+      dataNascimento: '',
+      endereco: '',
       ativo: '',
       tipoUsuario: '',
       foto: '',
     })
 
-    // 🔹 Versão editável
     const usuarioEditado = ref({ ...usuario.value })
-
+    const selectedPhotoFile = ref<File | null>(null)
     const defaultFoto = new URL('../../assets/images/default-avatar.png', import.meta.url).href
 
-    // ✅ Função que busca os dados do usuário logado no backend
+    // ✅ Carregar dados do técnico logado
     const carregarDadosUsuario = async () => {
       try {
         const token = auth.access
         if (!token) {
-          console.warn('⚠️ Nenhum token encontrado, redirecionando para login...')
+          console.warn('⚠️ Nenhum token encontrado. Redirecionando para login...')
           router.push('/')
           return
         }
 
-         
-    const response = await api.get('/me/', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+        const response = await api.get('/me/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
+        const data = response.data
         usuario.value = {
-        nome: response.data.name,
-        email: response.data.email,
-        cargo: response.data.cargo || 'Não informado',
-        cpf: response.data.cpf || '---',
-        dataNascimento: response.data.dt_nascimento || '---',
-        endereco: response.data.endereco || '---',
-        ativo: response.data.is_active ? 'Ativo' : 'Inativo',
-        tipoUsuario: response.data.is_staff ? 'Técnico' : '',
-        foto: response.data.foto_user || '',
-}
-
+          nome: data.name,
+          email: data.email,
+          cargo: data.cargo || 'Não informado',
+          cpf: data.cpf || '---',
+          dataNascimento: data.dt_nascimento || '---',
+          endereco: data.endereco || '---',
+          ativo: data.is_active ? 'Ativo' : 'Inativo',
+          tipoUsuario: 'Técnico',
+          foto: data.foto_user || '',
+        }
 
         usuarioEditado.value = { ...usuario.value }
-        console.log('👤 Dados do usuário carregados:', usuario.value)
-      } catch (error) {
-        console.error('Erro ao carregar dados do usuário:', error.response?.data || error)
+
+        // 🔹 Atualiza o Pinia para refletir no sidebar
+        auth.user = data
+
+        console.log('👤 Dados do técnico carregados:', usuario.value)
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar dados do técnico:', error.response?.data || error)
         if (error.response?.status === 401) {
           alert('Sessão expirada. Faça login novamente.')
           router.push('/')
@@ -211,65 +212,75 @@ export default defineComponent({
       }
     }
 
-    // 🚀 Busca os dados assim que o componente for montado
     onMounted(() => {
       carregarDadosUsuario()
     })
 
-    // 🔹 Edição local
+    // 🟢 Entrar em modo de edição
     const enterEditMode = () => {
       usuarioEditado.value = { ...usuario.value }
       editMode.value = true
     }
 
+    // 🟢 Cancelar edição
     const cancelEdit = () => {
       usuarioEditado.value = { ...usuario.value }
       editMode.value = false
     }
 
-   const saveChanges = async () => {
-  try {
-    const token = auth.access
-    if (!token) {
-      alert('Sessão expirada. Faça login novamente.')
-      router.push('/')
-      return
+    // 🟢 Salvar alterações (com upload da foto)
+    const saveChanges = async () => {
+      try {
+        const token = auth.access
+        if (!token) {
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
+          return
+        }
+
+        const formData = new FormData()
+        formData.append('name', usuarioEditado.value.nome)
+        formData.append('email', usuarioEditado.value.email)
+        formData.append('cpf', usuarioEditado.value.cpf)
+        formData.append('cargo', usuarioEditado.value.cargo)
+        formData.append('dt_nascimento', usuarioEditado.value.dataNascimento)
+        formData.append('endereco', usuarioEditado.value.endereco)
+
+        if (selectedPhotoFile.value) {
+          formData.append('foto_user', selectedPhotoFile.value)
+        }
+
+        const response = await api.patch('/me/', formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+
+        // Atualiza os dados locais
+        usuario.value = {
+          ...usuario.value,
+          nome: response.data.name,
+          email: response.data.email,
+          cpf: response.data.cpf,
+          cargo: response.data.cargo,
+          dataNascimento: response.data.dt_nascimento,
+          endereco: response.data.endereco,
+          foto: response.data.foto_user || usuarioEditado.value.foto,
+        }
+
+        // Atualiza o estado global → Sidebar reflete automaticamente
+        auth.user = response.data
+
+        editMode.value = false
+        alert('✅ Alterações salvas com sucesso!')
+      } catch (error: any) {
+        console.error('❌ Erro ao salvar alterações:', error.response?.data || error)
+        alert('Erro ao salvar alterações. Verifique os campos e tente novamente.')
+      }
     }
 
-    // Monta os dados que o backend espera
-    const payload = {
-      name: usuarioEditado.value.nome,
-      email: usuarioEditado.value.email,
-      cpf: usuarioEditado.value.cpf,
-      cargo: usuarioEditado.value.cargo,
-      dt_nascimento: usuarioEditado.value.dataNascimento,
-      endereco: usuarioEditado.value.endereco,
-    }
-
-    // Faz o PUT/PATCH na API
-    const response = await api.patch('me/', payload, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    usuario.value = {
-      ...usuario.value,
-      nome: response.data.name,
-      email: response.data.email,
-      cpf: response.data.cpf,
-      cargo: response.data.cargo,
-      dataNascimento: response.data.dt_nascimento,
-      endereco: response.data.endereco,
-    }
-
-    editMode.value = false
-    alert('Alterações salvas com sucesso!')
-  } catch (error) {
-    console.error('Erro ao salvar alterações:', error.response?.data || error)
-    alert('Erro ao salvar alterações. Verifique os campos e tente novamente.')
-  }
-}
-
-
+    // 🟢 Alterar foto de perfil (pré-visualização e upload)
     const changePhoto = () => {
       const input = document.createElement('input')
       input.type = 'file'
@@ -277,16 +288,21 @@ export default defineComponent({
       input.onchange = (e) => {
         const target = e.target as HTMLInputElement
         if (target.files && target.files[0]) {
+          const file = target.files[0]
+          selectedPhotoFile.value = file
+
+          // Exibe a prévia da imagem antes de enviar
           const reader = new FileReader()
           reader.onload = (e) => {
             usuarioEditado.value.foto = e.target?.result as string
           }
-          reader.readAsDataURL(target.files[0])
+          reader.readAsDataURL(file)
         }
       }
       input.click()
     }
 
+    // 🟢 Alterar senha (simulação)
     const changePassword = () => {
       const newPassword = prompt('Digite sua nova senha:')
       if (newPassword) {
@@ -308,6 +324,7 @@ export default defineComponent({
   },
 })
 </script>
+
 
 
 

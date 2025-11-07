@@ -36,7 +36,14 @@ export const useAuthStore = defineStore('auth', {
       } catch (error: any) {
         throw error.response?.data?.detail || 'Erro ao realizar login';
       }
+        const meResponse = await api.get('/me/', {
+        headers: { Authorization: `Bearer ${this.access}` }
+      })
+      this.user = meResponse.data
+
     },
+
+    
 
     logout() {
       this.user = null;

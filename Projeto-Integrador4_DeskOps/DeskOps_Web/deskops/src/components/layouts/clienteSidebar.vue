@@ -17,15 +17,25 @@
       </router-link>
     </nav>
 
-    <!-- Perfil com dropdown lateral -->
-    <div class="profile-container" ref="profileContainer" @click.stop>
-      <div class="sidebar-profile" @click="toggleProfileMenu">
-        <div class="profile-image">👤</div>
+     <!-- Perfil -->
+        <div class="profile-container" ref="profileContainer" @click.stop>
+          <div class="sidebar-profile" @click="toggleProfileMenu">
+            <div class="profile-image">
+      <img
+        v-if="usuario.foto"
+        :src="usuario.foto"
+        alt="Foto de perfil"
+        class="user-photo"
+      />
+   
+    </div>
+
         <div class="profile-info">
           <p class="profile-name">{{ usuario.nome }}</p>
           <p class="profile-email">{{ usuario.email }}</p>
         </div>
       </div>
+
 
       <!-- Dropdown à direita com transição -->
       <transition name="slide-right">
@@ -48,6 +58,7 @@
 import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import api from '@/services/api'
 
 export default defineComponent({
   name: 'ClienteSidebar',
@@ -55,16 +66,18 @@ export default defineComponent({
     const router = useRouter()
     const auth = useAuthStore()
     const profileMenuOpen = ref(false)
+    const defaultFoto = new URL('@/assets/images/default-avatar.png', import.meta.url).href
 
     // ✅ Computed seguro, sincronizado com o Pinia
     const usuario = computed(() => {
       const user = auth.user
       if (!user) {
-        return { nome: 'Usuário', email: 'sem@email.com' }
+        return { nome: 'Usuário', email: 'sem@email.com', foto: '' }
       }
       return {
         nome: user.name || 'Usuário',
-        email: user.email || 'sem@email.com'
+        email: user.email || 'sem@email.com',
+        foto: user.foto_user || ''
       }
     })
 
@@ -107,7 +120,8 @@ export default defineComponent({
       goToPerfil,
       goToLogin,
       initialize,
-      cleanup
+      cleanup,
+      defaultFoto
     }
   },
   mounted() {
@@ -193,6 +207,14 @@ export default defineComponent({
   padding: 15px 10px 0 10px;
   overflow: visible;
 }
+.user-photo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #93bfa7;
+}
+
 
 .sidebar-profile {
   display: flex;

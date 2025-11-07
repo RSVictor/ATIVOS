@@ -88,6 +88,7 @@ class Ativo(models.Model):
 class Chamado(models.Model):
     title = models.CharField(max_length=250, null=False)
     description = models.CharField(max_length=250, null=False)
+    categoria = models.CharField(max_length=100, blank=True, null=True)
     dt_criacao = models.DateTimeField(auto_now_add=True)
     status = models.CharField(
         max_length=60,

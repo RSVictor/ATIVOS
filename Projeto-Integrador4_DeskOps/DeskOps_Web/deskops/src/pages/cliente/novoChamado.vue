@@ -47,6 +47,28 @@
               </select>
             </div>
 
+          <div class="form-section">
+            <h3 class="section-title">Ativo</h3>
+            <select v-model="ativoSelecionado" class="form-select">
+              <option value="" disabled>Selecione um ativo</option>
+              <option v-for="a in ativos" :key="a.id" :value="a.id">
+                {{ a.name || a.nome || `Ativo #${a.id}` }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-section">
+            <h3 class="section-title">Ambiente</h3>
+            <select v-model="ambienteSelecionado" class="form-select">
+              <option value="" disabled>Selecione um ambiente</option>
+              <option v-for="amb in ambientes" :key="amb.id" :value="amb.id">
+                {{ amb.nome || amb.name || `Ambiente #${amb.id}` }}
+              </option>
+            </select>
+          </div>
+
+
+
             <div class="form-section">
               <h3 class="section-title">Prioridade</h3>
               <select v-model="prioridade" class="form-select">
@@ -135,6 +157,10 @@ export default defineComponent({
     const descricao = ref('')
     const categoria = ref('')
     const prioridade = ref('')
+    const ativos = ref([])                
+    const ativoSelecionado = ref('') 
+    const ambientes = ref([])              
+    const ambienteSelecionado = ref('')
     const imagemURL = ref<string | null>(null)
     const imagem = ref<File | null>(null)
 
@@ -146,6 +172,29 @@ export default defineComponent({
       { value: 'baixa', label: 'Baixa' },
     ])
     const maxDescricaoChars = 2830
+
+    const carregarAtivos = async () => {
+  try {
+    const token = auth.access
+    const response = await api.get('/ativo/', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    ativos.value = response.data.results || response.data
+  } catch (error: any) {
+    console.error('❌ Erro ao carregar ativos:', error.response?.data || error)
+  }
+}
+    const carregarAmbientes = async () => {
+  try {
+    const token = auth.access
+    const response = await api.get('/environment/', { 
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    ambientes.value = response.data.results || response.data
+  } catch (error: any) {
+    console.error('❌ Erro ao carregar ambientes:', error.response?.data || error)
+  }
+}
 
     // ✅ Criação de um novo chamado
     const submitChamado = async () => {
@@ -167,9 +216,23 @@ export default defineComponent({
         formData.append('description', descricao.value)
         formData.append('prioridade', prioridade.value.toUpperCase())
         formData.append('status', 'AGUARDANDO_ATENDIMENTO')
+        formData.append('asset', ativoSelecionado.value)
+        formData.append('ambiente', ambienteSelecionado.value)
+        formData.append('environment_id', ambienteSelecionado.value)
+        formData.append('categoria', categoria.value)
 
-        // ⚙️ Substituir por ID real do ativo (se for dinâmico)
-        formData.append('asset', '1')
+
+
+        if (!ativoSelecionado.value) {
+          alert('Por favor, selecione um ativo!')
+          return
+        }
+        formData.append('asset', ativoSelecionado.value)
+
+        if (!ativoSelecionado.value || !ambienteSelecionado.value) {
+          alert('Por favor, selecione um ativo e um ambiente!')
+          return
+        }
 
         if (imagem.value) {
           formData.append('photo', imagem.value)
@@ -235,6 +298,9 @@ export default defineComponent({
       }
     }
 
+    carregarAtivos()
+    carregarAmbientes()
+
     return {
       titulo,
       descricao,
@@ -249,6 +315,10 @@ export default defineComponent({
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
+      ativos,
+      ativoSelecionado,
+      ambientes,
+      ambienteSelecionado
     }
   },
 })

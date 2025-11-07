@@ -44,7 +44,9 @@ class AtivoSerializer(serializers.ModelSerializer):
 
 
 class ChamadoSerializer(serializers.ModelSerializer):
-    environment = serializers.PrimaryKeyRelatedField(
+    environment = EnvironmentSerializer(read_only=True)  
+    environment_id = serializers.PrimaryKeyRelatedField(  
+        source='environment',
         queryset=Environment.objects.all(),
         write_only=True,
         required=False
