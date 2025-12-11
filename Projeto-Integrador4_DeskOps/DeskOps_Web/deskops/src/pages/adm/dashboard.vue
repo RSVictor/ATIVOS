@@ -187,11 +187,24 @@ const carregarDados = async () => {
     })
 
     const chamados = chamadosResp.data.results || chamadosResp.data
-    metrics.value.chamadosAbertos = chamados.length
-    metrics.value.chamadosConcluidos  = chamados.filter(c => c.status?.toLowerCase().includes('conclu')).length
-    metrics.value.chamadosAguardando = chamados.filter(c => c.status?.toLowerCase().includes('aguard')).length
-    metrics.value.chamadosAndamento = chamados.filter(c => c.status?.toLowerCase().includes('andamento')).length
-    metrics.value.chamadosCancelados = chamados.filter(c => c.status?.toLowerCase().includes('cancel')).length
+   metrics.value.chamadosConcluidos = chamados.filter((c: any) =>
+  c.status?.toLowerCase().includes('conclu')
+).length
+
+metrics.value.chamadosAguardando = chamados.filter((c: any) =>
+  c.status?.toLowerCase().includes('aguard')
+).length
+
+metrics.value.chamadosAndamento = chamados.filter((c: any) =>
+  c.status?.toLowerCase().includes('andamento')
+).length
+
+metrics.value.chamadosCancelados = chamados.filter((c: any) =>
+  c.status?.toLowerCase().includes('cancel')
+).length
+
+metrics.value.usuariosAtivos = usuarios.filter((u: any) => u.is_active).length
+
 
     // ✅ Usuários
     const usuariosResp = await api.get('/usuarios/', {
