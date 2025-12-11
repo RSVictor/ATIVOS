@@ -197,7 +197,6 @@ export default defineComponent({
 })
 </script>
 
-
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
