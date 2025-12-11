@@ -98,7 +98,7 @@
             </p>
 
             <!-- Botão Encerrar Chamado -->
-            <button class="btn-encerrar" @click="confirmarEncerramento">Encerrar Chamado</button>
+            <button class="btn-encerrar" @click="encerrarChamado">Encerrar Chamado</button>
           </div>
         </div>
 
@@ -108,53 +108,12 @@
         </div>
       </div>
     </main>
-
-    <!-- Popup de Confirmação -->
-    <div v-if="showPopup" class="popup-overlay" @click.self="closePopup">
-      <div class="popup-container">
-        <div class="popup-header">
-          <span class="material-icons popup-icon" :class="popupType">
-            {{ popupIcon }}
-          </span>
-          <h3 class="popup-title">{{ popupTitle }}</h3>
-        </div>
-        
-        <div class="popup-content">
-          <p class="popup-message">{{ popupMessage }}</p>
-        </div>
-
-        <div class="popup-actions">
-          <button 
-            v-if="popupType === 'confirm'"
-            class="popup-btn popup-btn-cancel" 
-            @click="closePopup"
-            :disabled="isLoading"
-          >
-            Cancelar
-          </button>
-          <button 
-            class="popup-btn popup-btn-confirm" 
-            :class="popupType"
-            @click="handlePopupConfirm"
-            :disabled="isLoading"
-          >
-            {{ isLoading ? 'Processando...' : popupConfirmText }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div v-if="isLoading" class="loading-overlay">
-      <div class="loading-spinner"></div>
-      <p class="loading-text">{{ loadingText }}</p>
-    </div>
   </div>
 </template>
 
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from 'vue'
+import { defineComponent, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
 import api from '@/services/api'
@@ -171,53 +130,8 @@ export default defineComponent({
 
     const chamado = ref<any>(null)
     const tecnico = ref<any>(null)
-    const isLoading = ref(false)
-    const loadingText = ref('Processando...')
-
-    // 🔹 Estados para o popup
-    const showPopup = ref(false)
-    const popupType = ref<'success' | 'error' | 'confirm'>('confirm')
-    const popupTitle = ref('')
-    const popupMessage = ref('')
-    const popupConfirmText = ref('')
-    const popupAction = ref<(() => void) | null>(null)
-
-    // ✅ Função para mostrar popup personalizado
-    const showCustomPopup = (
-      type: 'success' | 'error' | 'confirm',
-      title: string,
-      message: string,
-      confirmText: string,
-      action?: () => void
-    ) => {
-      popupType.value = type
-      popupTitle.value = title
-      popupMessage.value = message
-      popupConfirmText.value = confirmText
-      popupAction.value = action || null
-      showPopup.value = true
-    }
-
-    const closePopup = () => {
-      showPopup.value = false
-      popupAction.value = null
-    }
-
-    const handlePopupConfirm = () => {
-      if (popupAction.value) {
-        popupAction.value()
-      }
-      closePopup()
-    }
-
-    const popupIcon = computed(() => {
-      switch (popupType.value) {
-        case 'success': return 'check_circle'
-        case 'error': return 'error'
-        case 'confirm': return 'help'
-        default: return 'info'
-      }
-    })
+    
+    const closeProfileMenu = () => {}
 
     // ✅ Função para buscar os detalhes do chamado
     const carregarChamado = async () => {
@@ -274,7 +188,7 @@ export default defineComponent({
         console.log('📋 Chamado carregado:', chamado.value)
       } catch (error: any) {
         console.error('❌ Erro ao carregar chamado:', error.response?.data || error)
-        showCustomPopup('error', 'Erro', 'Erro ao carregar detalhes do chamado.', 'OK')
+        alert('Erro ao carregar detalhes do chamado.')
       }
     }
 
@@ -326,61 +240,17 @@ export default defineComponent({
       }
     }
 
-    // ✅ Confirmar encerramento do chamado
-    const confirmarEncerramento = () => {
-      showCustomPopup(
-        'confirm',
-        'Encerrar Chamado',
-        'Tem certeza que deseja encerrar este chamado? Esta ação não pode ser desfeita.',
-        'Encerrar',
-        encerrarChamado
-      )
-    }
-
     // ✅ Função para encerrar o chamado
     const encerrarChamado = async () => {
       try {
-        isLoading.value = true
-        loadingText.value = 'Encerrando chamado...'
-
         const id = route.params.id
-        const token = auth.access
-
-        if (!token) {
-          showCustomPopup('error', 'Erro de Sessão', 'Sessão expirada. Faça login novamente.', 'OK', () => {
-            router.push('/')
-          })
-          return
-        }
-
         await api.patch(`/chamados/${id}/encerrar/`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${auth.access}` },
         })
-        
-        showCustomPopup(
-          'success',
-          'Sucesso!',
-          'Chamado encerrado com sucesso! Você será redirecionado para a lista de chamados.',
-          'OK',
-          () => {
-            router.push('/cliente/meus-chamados')
-          }
-        )
-      } catch (error: any) {
-        console.error('❌ Erro ao encerrar chamado:', error.response?.data || error)
-        
-        let errorMessage = 'Erro ao encerrar chamado. Tente novamente.'
-        if (error.response?.data) {
-          if (typeof error.response.data === 'object') {
-            errorMessage = Object.values(error.response.data).flat().join('\n')
-          } else {
-            errorMessage = error.response.data
-          }
-        }
-
-        showCustomPopup('error', 'Erro', errorMessage, 'OK')
-      } finally {
-        isLoading.value = false
+        alert('Chamado encerrado com sucesso!')
+        router.push('/cliente/meus-chamados')
+      } catch (error) {
+        alert('Erro ao encerrar chamado.')
       }
     }
 
@@ -391,23 +261,13 @@ export default defineComponent({
     return {
       chamado,
       tecnico,
-      isLoading,
-      showPopup,
-      popupType,
-      popupTitle,
-      popupMessage,
-      popupConfirmText,
-      popupIcon,
-      loadingText,
       statusClass,
       statusIcon,
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
-      confirmarEncerramento,
-      encerrarChamado,
-      closePopup,
-      handlePopupConfirm
+      closeProfileMenu,
+      encerrarChamado
     }
   },
 })
@@ -429,7 +289,7 @@ export default defineComponent({
 html, body, #app {
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  overflow: auto; /* ✅ antes era hidden */
 }
 
 /* CONTAINER PRINCIPAL - FULLSCREEN */
@@ -448,15 +308,14 @@ html, body, #app {
   bottom: 0;
 }
 
-/* CONTEÚDO PRINCIPAL - LAYOUT FULLSCREEN COM SCROLL */
+/* CONTEÚDO PRINCIPAL - LAYOUT FULLSCREEN */
 .main-content {
   flex: 1;
   background-color: #fff;
   margin-left: 250px;
   width: calc(100vw - 250px);
   height: 100vh;
-  overflow-y: auto; /* ✅ Permite scroll vertical apenas no conteúdo principal */
-  overflow-x: hidden; /* ✅ Evita scroll horizontal */
+  overflow: hidden;
   display: flex;
   justify-content: center;
 }
@@ -466,9 +325,10 @@ html, body, #app {
   display: flex;
   flex-direction: column;
   max-width: 1200px;
-  min-height: 100%; /* ✅ Garante que ocupe pelo menos 100% da altura */
+  height: auto;
+  min-height: 100vh;
+  overflow: hidden;
   padding: 0 40px;
-  padding-bottom: 100px; /* ✅ Espaço extra no final para scroll */
 }
 
 /* CORREÇÃO: Material-icons no conteúdo principal devem herdar a cor do contexto */
@@ -566,7 +426,6 @@ html, body, #app {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  min-height: 600px; /* ✅ Altura mínima para forçar scroll */
 }
 
 .card-summary {
@@ -582,7 +441,6 @@ html, body, #app {
   text-align: left;
   gap: 16px;
   height: fit-content;
-  min-height: 400px; /* ✅ Altura mínima para forçar scroll */
 }
 
 /* Header do Card */
@@ -756,219 +614,8 @@ html, body, #app {
   transition: background-color 0.2s;
 }
 
-.btn-encerrar:hover:not(:disabled) {
+.btn-encerrar:hover {
   background-color: #333;
-}
-
-.btn-encerrar:disabled {
-  background-color: #666;
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-/* POPUP STYLES */
-.popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.popup-container {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  width: 90%;
-  max-width: 400px;
-  overflow: hidden;
-  animation: slideUp 0.3s ease-out;
-}
-
-.popup-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 24px 24px 16px 24px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.popup-icon {
-  font-size: 28px;
-  border-radius: 50%;
-  padding: 4px;
-}
-
-.popup-icon.success {
-  color: #065f46;
-  background-color: #d1fae5;
-}
-
-.popup-icon.error {
-  color: #842029;
-  background-color: #f8d7da;
-}
-
-.popup-icon.confirm {
-  color: #084298;
-  background-color: #cfe2ff;
-}
-
-.popup-title {
-  color: #000;
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.popup-content {
-  padding: 20px 24px;
-}
-
-.popup-message {
-  color: #333;
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0 0 15px 0;
-  text-align: left;
-}
-
-.popup-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding: 16px 24px 24px 24px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.popup-btn {
-  padding: 10px 24px;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 80px;
-}
-
-.popup-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.popup-btn-cancel {
-  background-color: #f8f9fa;
-  color: #333;
-  border: 1px solid #d0d0d0;
-}
-
-.popup-btn-cancel:hover:not(:disabled) {
-  background-color: #e9ecef;
-}
-
-.popup-btn-confirm {
-  background-color: #000;
-  color: #fff;
-}
-
-.popup-btn-confirm:hover:not(:disabled) {
-  background-color: #333;
-}
-
-.popup-btn-confirm.success {
-  background-color: #065f46;
-}
-
-.popup-btn-confirm.success:hover:not(:disabled) {
-  background-color: #054c38;
-}
-
-.popup-btn-confirm.error {
-  background-color: #842029;
-}
-
-.popup-btn-confirm.error:hover:not(:disabled) {
-  background-color: #6a1a21;
-}
-
-/* LOADING OVERLAY */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.9);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  z-index: 1001;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #000;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
-}
-
-.loading-text {
-  color: #333;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-/* SCROLLBAR PERSONALIZADA PARA O CONTEÚDO PRINCIPAL */
-.main-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.main-content::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-.main-content::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-.main-content::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
-
-/* ANIMATIONS */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { 
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 /* RESPONSIVIDADE */
@@ -990,7 +637,6 @@ html, body, #app {
   .card-summary {
     flex: none;
     width: 100%;
-    min-height: auto; /* Remove altura mínima em tablets */
   }
 }
 
@@ -1004,7 +650,6 @@ html, body, #app {
     margin-left: 0;
     height: auto;
     min-height: calc(100vh - 200px);
-    overflow-y: auto;
   }
   
   .content-area {
@@ -1030,24 +675,6 @@ html, body, #app {
   
   .date-container.right {
     text-align: left;
-  }
-  
-  .card-form,
-  .card-summary {
-    min-height: auto; /* Remove altura mínima em mobile */
-  }
-
-  .popup-container {
-    width: 95%;
-    margin: 20px;
-  }
-
-  .popup-actions {
-    flex-direction: column;
-  }
-
-  .popup-btn {
-    width: 100%;
   }
 }
 

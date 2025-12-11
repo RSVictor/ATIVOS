@@ -20,7 +20,7 @@
               <span class="material-icons">edit</span>
               Editar Ambiente
             </button>
-            <button class="btn-excluir" @click.stop="confirmarExclusao">
+            <button class="btn-excluir" @click.stop="excluirAmbiente">
               <span class="material-icons">delete</span>
               Excluir Ambiente
             </button>
@@ -114,9 +114,9 @@
                   <span class="material-icons">close</span>
                   Cancelar
                 </button>
-                <button class="btn-salvar" @click="confirmarEdicao" :disabled="isLoading">
+                <button class="btn-salvar" @click="salvarEdicao">
                   <span class="material-icons">save</span>
-                  {{ isLoading ? 'Salvando...' : 'Salvar Alterações' }}
+                  Salvar Alterações
                 </button>
               </div>
             </div>
@@ -156,52 +156,11 @@
       </div>
     </main>
     <p v-else class="loading-msg">Carregando ambiente...</p>
-
-    <!-- Popup de Confirmação -->
-    <div v-if="showPopup" class="popup-overlay" @click.self="closePopup">
-      <div class="popup-container">
-        <div class="popup-header">
-          <span class="material-icons popup-icon" :class="popupType">
-            {{ popupIcon }}
-          </span>
-          <h3 class="popup-title">{{ popupTitle }}</h3>
-        </div>
-        
-        <div class="popup-content">
-          <p class="popup-message">{{ popupMessage }}</p>
-        </div>
-
-        <div class="popup-actions">
-          <button 
-            v-if="popupType === 'confirm'"
-            class="popup-btn popup-btn-cancel" 
-            @click="closePopup"
-            :disabled="isLoading"
-          >
-            Cancelar
-          </button>
-          <button 
-            class="popup-btn popup-btn-confirm" 
-            :class="popupType"
-            @click="handlePopupConfirm"
-            :disabled="isLoading"
-          >
-            {{ isLoading ? 'Processando...' : popupConfirmText }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div v-if="isLoading" class="loading-overlay">
-      <div class="loading-spinner"></div>
-      <p class="loading-text">{{ loadingText }}</p>
-    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, onMounted, computed } from 'vue'
+import { defineComponent, ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
 import api from '@/services/api'
@@ -231,17 +190,6 @@ export default defineComponent({
 
     const ambiente = ref<Ambiente | null>(null)
     const editando = ref(false)
-    const isLoading = ref(false)
-    const loadingText = ref('Processando...')
-
-    // Estados para o popup
-    const showPopup = ref(false)
-    const popupType = ref<'success' | 'error' | 'confirm'>('confirm')
-    const popupTitle = ref('')
-    const popupMessage = ref('')
-    const popupConfirmText = ref('')
-    const popupAction = ref<(() => void) | null>(null)
-
     const formEdit = reactive({
       nome: '',
       descricao: '',
@@ -254,9 +202,8 @@ export default defineComponent({
         const id = route.params.id
         const token = auth.access
         if (!token) {
-          showCustomPopup('error', 'Erro de sessão', 'Sessão expirada. Faça login novamente.', 'OK', () => {
-            router.push('/')
-          })
+          alert('Sessão expirada. Faça login novamente.')
+          router.push('/')
           return
         }
 
@@ -279,47 +226,12 @@ export default defineComponent({
 
       } catch (error: any) {
         console.error('❌ Erro ao carregar ambiente:', error.response?.data || error)
-        showCustomPopup('error', 'Erro', 'Erro ao carregar detalhes do ambiente.', 'OK', () => {
-          router.push('/adm/gestao-ambiente')
-        })
+        alert('Erro ao carregar detalhes do ambiente.')
       }
     }
 
-    // Função para mostrar popup personalizado
-    const showCustomPopup = (
-      type: 'success' | 'error' | 'confirm',
-      title: string,
-      message: string,
-      confirmText: string,
-      action?: () => void
-    ) => {
-      popupType.value = type
-      popupTitle.value = title
-      popupMessage.value = message
-      popupConfirmText.value = confirmText
-      popupAction.value = action || null
-      showPopup.value = true
-    }
-
-    const closePopup = () => {
-      showPopup.value = false
-      popupAction.value = null
-    }
-
-    const handlePopupConfirm = () => {
-      if (popupAction.value) {
-        popupAction.value()
-      }
-      closePopup()
-    }
-
-    const popupIcon = computed(() => {
-      switch (popupType.value) {
-        case 'success': return 'check_circle'
-        case 'error': return 'error'
-        case 'confirm': return 'help'
-        default: return 'info'
-      }
+    onMounted(() => {
+      carregarAmbiente()
     })
 
     const iniciarEdicao = () => {
@@ -330,47 +242,11 @@ export default defineComponent({
       editando.value = true
     }
 
-    const cancelarEdicao = () => { 
-      editando.value = false 
-    }
-
-    const confirmarEdicao = () => {
-      if (!ambiente.value) return
-
-      // Validações básicas
-      if (!formEdit.nome.trim()) {
-        showCustomPopup('error', 'Campo obrigatório', 'Informe o nome do ambiente.', 'OK')
-        return
-      }
-      if (!formEdit.descricao.trim()) {
-        showCustomPopup('error', 'Campo obrigatório', 'Informe a descrição do ambiente.', 'OK')
-        return
-      }
-      if (!formEdit.responsavel.nome.trim()) {
-        showCustomPopup('error', 'Campo obrigatório', 'Informe o nome do responsável.', 'OK')
-        return
-      }
-      if (!formEdit.responsavel.email.trim()) {
-        showCustomPopup('error', 'Campo obrigatório', 'Informe o email do responsável.', 'OK')
-        return
-      }
-
-      showCustomPopup(
-        'confirm',
-        'Confirmar Edição',
-        'Tem certeza que deseja salvar as alterações neste ambiente?',
-        'Salvar',
-        salvarEdicao
-      )
-    }
+    const cancelarEdicao = () => { editando.value = false }
 
     const salvarEdicao = async () => {
-      if (!ambiente.value) return
-
-      isLoading.value = true
-      loadingText.value = 'Salvando alterações...'
-
       try {
+        if (!ambiente.value) return
         const token = auth.access
         await api.patch(`/environment/${ambiente.value.id}/`, {
           name: formEdit.nome,
@@ -383,127 +259,57 @@ export default defineComponent({
           headers: { Authorization: `Bearer ${token}` }
         })
 
-        // Atualiza o objeto ambiente com os novos dados
-        if (ambiente.value) {
-          ambiente.value.nome = formEdit.nome
-          ambiente.value.descricao = formEdit.descricao
-          ambiente.value.responsavel = { ...formEdit.responsavel }
-          ambiente.value.atualizadoEm = new Date().toLocaleString('pt-BR')
-        }
-        
+        ambiente.value.nome = formEdit.nome
+        ambiente.value.descricao = formEdit.descricao
+        ambiente.value.atualizadoEm = new Date().toLocaleString('pt-BR')
         editando.value = false
-        
-        showCustomPopup(
-          'success',
-          'Sucesso!',
-          'Alterações salvas com sucesso!',
-          'OK'
-        )
+        alert('✅ Alterações salvas com sucesso!')
       } catch (error: any) {
         console.error('❌ Erro ao salvar ambiente:', error.response?.data || error)
-        
-        let errorMessage = 'Erro ao salvar alterações.'
-        if (error.response?.data) {
-          if (typeof error.response.data === 'object') {
-            errorMessage = Object.values(error.response.data).flat().join('\n')
-          } else {
-            errorMessage = error.response.data
-          }
-        }
-
-        showCustomPopup('error', 'Erro', errorMessage, 'OK')
-      } finally {
-        isLoading.value = false
+        alert('Erro ao salvar alterações.')
       }
-    }
-
-    const confirmarExclusao = () => {
-      if (!ambiente.value) return
-      
-      showCustomPopup(
-        'confirm',
-        'Confirmar Exclusão',
-        'Tem certeza que deseja excluir este ambiente? Esta ação não pode ser desfeita.',
-        'Excluir',
-        excluirAmbiente
-      )
     }
 
     const excluirAmbiente = async () => {
       if (!ambiente.value) return
-      
-      isLoading.value = true
-      loadingText.value = 'Excluindo ambiente...'
-
-      try {
-        const token = auth.access
-        await api.delete(`/environment/${ambiente.value.id}/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        
-        showCustomPopup(
-          'success',
-          'Sucesso!',
-          'Ambiente excluído com sucesso!',
-          'OK',
-          () => router.push('/adm/gestao-ambiente')
-        )
-      } catch (error: any) {
-        console.error('❌ Erro ao excluir ambiente:', error.response?.data || error)
-        
-        let errorMessage = 'Erro ao excluir ambiente.'
-        if (error.response?.data) {
-          if (typeof error.response.data === 'object') {
-            errorMessage = Object.values(error.response.data).flat().join('\n')
-          } else {
-            errorMessage = error.response.data
-          }
-        }
-
-        if (error.response?.status === 404) {
-          errorMessage = 'Este ambiente não existe mais (foi excluído).'
-          showCustomPopup('error', 'Erro', errorMessage, 'OK', () => {
-            router.push('/adm/gestao-ambiente')
+      if (confirm('Tem certeza que deseja excluir este ambiente?')) {
+        try {
+          const token = auth.access
+          await api.delete(`/environment/${ambiente.value.id}/`, {
+            headers: { Authorization: `Bearer ${token}` }
           })
-          return
-        }
+          alert('🗑️ Ambiente excluído com sucesso!')
+          router.push('/adm/gestao-ambientes')
+        } catch (error: any) {
+          console.error('❌ Erro ao excluir ambiente:', error.response?.data || error)
+          if (error.response?.status === 404) {
+            alert('❌ Este ambiente não existe mais (foi excluído).')
+            router.push('/adm/gestao-ambientes') // ✅ volta pra lista automaticamente
+            return
+  }
 
-        showCustomPopup('error', 'Erro', errorMessage, 'OK')
-      } finally {
-        isLoading.value = false
+  alert('Erro ao carregar detalhes do ambiente.')
+}
+        }
       }
-    }
+    
 
     const closeProfileMenu = () => {}
-
-    onMounted(() => {
-      carregarAmbiente()
-    })
 
     return {
       ambiente,
       editando,
       formEdit,
-      isLoading,
-      showPopup,
-      popupType,
-      popupTitle,
-      popupMessage,
-      popupConfirmText,
-      popupIcon,
-      loadingText,
       closeProfileMenu,
-      confirmarExclusao,
+      excluirAmbiente,
       iniciarEdicao,
       cancelarEdicao,
-      confirmarEdicao,
-      salvarEdicao,
-      closePopup,
-      handlePopupConfirm
+      salvarEdicao
     }
   }
 })
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
@@ -875,14 +681,9 @@ html, body, #app {
   transition: all 0.2s;
 }
 
-.btn-salvar:hover:not(:disabled) {
+.btn-salvar:hover {
   background-color: #059669;
   color: white;
-}
-
-.btn-salvar:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .btn-cancelar .material-icons,
@@ -936,192 +737,6 @@ html, body, #app {
   color: #000;
   font-size: 14px;
   font-weight: 500;
-}
-
-/* POPUP STYLES - MESMO ESTILO DAS OUTRAS PÁGINAS */
-.popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.popup-container {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  width: 90%;
-  max-width: 400px;
-  overflow: hidden;
-  animation: slideUp 0.3s ease-out;
-}
-
-.popup-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 24px 24px 16px 24px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.popup-icon {
-  font-size: 28px;
-  border-radius: 50%;
-  padding: 4px;
-}
-
-.popup-icon.success {
-  color: #065f46;
-  background-color: #d1fae5;
-}
-
-.popup-icon.error {
-  color: #842029;
-  background-color: #f8d7da;
-}
-
-.popup-icon.confirm {
-  color: #084298;
-  background-color: #cfe2ff;
-}
-
-.popup-title {
-  color: #000;
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.popup-content {
-  padding: 20px 24px;
-}
-
-.popup-message {
-  color: #333;
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
-  text-align: left;
-}
-
-.popup-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding: 16px 24px 24px 24px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.popup-btn {
-  padding: 10px 24px;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 80px;
-}
-
-.popup-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.popup-btn-cancel {
-  background-color: #f8f9fa;
-  color: #333;
-  border: 1px solid #d0d0d0;
-}
-
-.popup-btn-cancel:hover:not(:disabled) {
-  background-color: #e9ecef;
-}
-
-.popup-btn-confirm {
-  background-color: #000;
-  color: #fff;
-}
-
-.popup-btn-confirm:hover:not(:disabled) {
-  background-color: #333;
-}
-
-.popup-btn-confirm.success {
-  background-color: #065f46;
-}
-
-.popup-btn-confirm.success:hover:not(:disabled) {
-  background-color: #054c38;
-}
-
-.popup-btn-confirm.error {
-  background-color: #842029;
-}
-
-.popup-btn-confirm.error:hover:not(:disabled) {
-  background-color: #6a1a21;
-}
-
-/* LOADING OVERLAY */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.9);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  z-index: 1001;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #000;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
-}
-
-.loading-text {
-  color: #333;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-/* ANIMATIONS */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { 
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 /* RESPONSIVIDADE */
@@ -1200,19 +815,6 @@ html, body, #app {
   
   .form-actions {
     flex-direction: column;
-  }
-
-  .popup-container {
-    width: 95%;
-    margin: 20px;
-  }
-
-  .popup-actions {
-    flex-direction: column;
-  }
-
-  .popup-btn {
-    width: 100%;
   }
 }
 
