@@ -145,9 +145,21 @@ import api from '@/services/api'
 
 Chart.register(...registerables)
 
+interface Usuario {
+  id: number
+  name: string
+  email: string
+  is_active: boolean
+}
+
+interface Chamado {
+  status: string
+}
+
 export default defineComponent({
   name: 'Dashboard',
   components: { AdmSidebar },
+
   setup() {
     const router = useRouter()
     const auth = useAuthStore()
@@ -172,82 +184,90 @@ export default defineComponent({
     const closeProfileMenu = () => {}
     const navigateTo = (route: string) => router.push(route)
 
-    // 🧩 Carregar dados do backend
-const carregarDados = async () => {
-  const token = auth.access
-  if (!token) {
-    router.push('/')
-    return
-  }
+    // ---------------------------------------------------------
+    // 🚀 CARREGAR DADOS (VERSÃO CORRIGIDA)
+    // ---------------------------------------------------------
+    const carregarDados = async () => {
+      const token = auth.access
+      if (!token) {
+        router.push('/')
+        return
+      }
 
-  try {
-    // ✅ Chamados
-    const chamadosResp = await api.get('/chamados/', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+      try {
+        // -----------------------
+        // 1️⃣ CHAMADOS
+        // -----------------------
+        const chamadosResp = await api.get('/chamados/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const chamados: Chamado[] = chamadosResp.data.results || chamadosResp.data
 
-    const chamados = chamadosResp.data.results || chamadosResp.data
-   metrics.value.chamadosConcluidos = chamados.filter((c: any) =>
-  c.status?.toLowerCase().includes('conclu')
-).length
+        metrics.value.chamadosAbertos = chamados.length
+        metrics.value.chamadosConcluidos = chamados.filter((c: Chamado) =>
+          c.status?.toLowerCase().includes('conclu')
+        ).length
 
-metrics.value.chamadosAguardando = chamados.filter((c: any) =>
-  c.status?.toLowerCase().includes('aguard')
-).length
+        metrics.value.chamadosAguardando = chamados.filter((c: Chamado) =>
+          c.status?.toLowerCase().includes('aguard')
+        ).length
 
-metrics.value.chamadosAndamento = chamados.filter((c: any) =>
-  c.status?.toLowerCase().includes('andamento')
-).length
+        metrics.value.chamadosAndamento = chamados.filter((c: Chamado) =>
+          c.status?.toLowerCase().includes('andamento')
+        ).length
 
-metrics.value.chamadosCancelados = chamados.filter((c: any) =>
-  c.status?.toLowerCase().includes('cancel')
-).length
+        metrics.value.chamadosCancelados = chamados.filter((c: Chamado) =>
+          c.status?.toLowerCase().includes('cancel')
+        ).length
 
-metrics.value.usuariosAtivos = usuarios.filter((u: any) => u.is_active).length
+        // -----------------------
+        // 2️⃣ USUÁRIOS
+        // -----------------------
+        const usuariosResp = await api.get('/usuarios/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
 
+        const usuarios: Usuario[] = usuariosResp.data.results || usuariosResp.data
 
-    // ✅ Usuários
-    const usuariosResp = await api.get('/usuarios/', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const usuarios = usuariosResp.data.results || usuariosResp.data
-    metrics.value.totalUsuarios = usuarios.length
-    metrics.value.usuariosAtivos = usuarios.filter(u => u.is_active).length
+        metrics.value.totalUsuarios = usuarios.length
+        metrics.value.usuariosAtivos = usuarios.filter((u: Usuario) => u.is_active).length
 
-    // ✅ Ambientes
-    const ambientesResp = await api.get('/environment/', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const ambientes = ambientesResp.data.results || ambientesResp.data
-    metrics.value.totalAmbientes = ambientes.length
+        // -----------------------
+        // 3️⃣ AMBIENTES
+        // -----------------------
+        const ambientesResp = await api.get('/environment/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
 
-    // ✅ Ativos
-    const ativosResp = await api.get('/ativo/', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const ativos = ativosResp.data.results || ativosResp.data
-    metrics.value.totalAtivos = ativos.length
+        const ambientes = ambientesResp.data.results || ambientesResp.data
+        metrics.value.totalAmbientes = ambientes.length
 
-    console.log('✅ Métricas carregadas:', metrics.value)
+        // -----------------------
+        // 4️⃣ ATIVOS
+        // -----------------------
+        const ativosResp = await api.get('/ativo/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
 
-    // Atualiza gráficos
-    initCharts()
+        const ativos = ativosResp.data.results || ativosResp.data
+        metrics.value.totalAtivos = ativos.length
 
-  } catch (error: any) {
-    console.error('❌ Erro ao carregar dados do dashboard:', error)
-    if (error.response) {
-      console.log('🧩 Código HTTP:', error.response.status)
-      console.log('🧩 Dados retornados:', error.response.data)
+        console.log('📊 Métricas carregadas:', metrics.value)
+
+        initCharts()
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar dashboard:', error)
+      }
     }
-  }
-}
 
-
-    // 🎨 Gráficos
+    // ---------------------------------------------------------
+    // 🎨 GRÁFICOS
+    // ---------------------------------------------------------
     const initCharts = () => {
       if (chamadosChartInstance) chamadosChartInstance.destroy()
       if (usuariosChartInstance) usuariosChartInstance.destroy()
 
+      // CHART 1 - Chamados
       if (chamadosChart.value) {
         const ctx = chamadosChart.value.getContext('2d')
         if (ctx) {
@@ -271,17 +291,12 @@ metrics.value.usuariosAtivos = usuarios.filter((u: any) => u.is_active).length
                 }
               ]
             },
-            options: {
-              responsive: true,
-              plugins: {
-                legend: { display: false },
-                title: { display: true, text: 'Chamados por Status' }
-              }
-            }
+            options: { responsive: true }
           })
         }
       }
 
+      // CHART 2 - Usuários
       if (usuariosChart.value) {
         const ctx = usuariosChart.value.getContext('2d')
         if (ctx) {
@@ -298,13 +313,6 @@ metrics.value.usuariosAtivos = usuarios.filter((u: any) => u.is_active).length
                   backgroundColor: ['#198754', '#dc3545']
                 }
               ]
-            },
-            options: {
-              responsive: true,
-              plugins: {
-                legend: { position: 'bottom' },
-                title: { display: true, text: 'Usuários Ativos x Inativos' }
-              }
             }
           })
         }
@@ -327,6 +335,7 @@ metrics.value.usuariosAtivos = usuarios.filter((u: any) => u.is_active).length
   }
 })
 </script>
+
 
 
 <style scoped>

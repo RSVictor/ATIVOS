@@ -1,9 +1,21 @@
-// src/services/api.d.ts
+import axios from "axios";
 
-// Para imports com alias "@/services/api"
-declare module '@/services/api' {
-  // Troque `any` pelo tipo correto se estiver usando Axios ou outra lib
-  const api: any;
-  export default api;
-}
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+export default api;
