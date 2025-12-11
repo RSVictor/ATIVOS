@@ -144,6 +144,18 @@ import ClienteSidebar from '@/components/layouts/clienteSidebar.vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 
+interface Ativo {
+  id: number
+  name?: string
+  nome?: string
+}
+
+interface Ambiente {
+  id: number
+  name?: string
+  nome?: string
+}
+
 export default defineComponent({
   name: 'NovoChamado',
   components: { ClienteSidebar },
@@ -152,17 +164,20 @@ export default defineComponent({
     const router = useRouter()
     const auth = useAuthStore()
 
-    // 🔹 Campos do formulário
     const titulo = ref('')
     const descricao = ref('')
     const categoria = ref('')
     const prioridade = ref('')
-    const ativos = ref([])                
-    const ativoSelecionado = ref('') 
-    const ambientes = ref([])              
-    const ambienteSelecionado = ref('')
+
+    const ativos = ref<Ativo[]>([])
+    const ativoSelecionado = ref<string>('')
+
+    const ambientes = ref<Ambiente[]>([])
+    const ambienteSelecionado = ref<string>('')
+
     const imagemURL = ref<string | null>(null)
     const imagem = ref<File | null>(null)
+
 
     // 🔹 Opções fixas
     const categorias = ref(['Manutenção', 'Suporte', 'Instalação', 'Rede', 'Software', 'Hardware'])

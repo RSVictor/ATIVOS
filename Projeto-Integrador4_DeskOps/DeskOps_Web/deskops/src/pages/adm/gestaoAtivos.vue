@@ -165,8 +165,9 @@ export default defineComponent({
         const matchStatus =
           filtroStatus.value === 'todos' || a.status === filtroStatus.value
         const matchAmbiente =
-          filtroAmbiente.value === 'todos' ||
-          a.ambiente.id === filtroAmbiente.value
+  filtroAmbiente.value === 'todos' ||
+  a.ambiente.id === Number(filtroAmbiente.value)
+
         const matchPesquisa =
           a.nome.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
           a.descricao.toLowerCase().includes(pesquisa.value.toLowerCase())
