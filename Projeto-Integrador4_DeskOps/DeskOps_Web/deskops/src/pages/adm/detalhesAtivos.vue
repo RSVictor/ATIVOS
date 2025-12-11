@@ -12,11 +12,11 @@
         <div class="title-container">
           <h1 class="page-title">Detalhes do Ativo</h1>
           <div class="action-buttons-header">
-            <button v-if="!editando" class="btn-editar" @click.stop="iniciarEdicao">
+            <button v-if="!editando && ativo" class="btn-editar" @click.stop="iniciarEdicao">
               <span class="material-icons">edit</span>
               Editar Ativo
             </button>
-            <button class="btn-excluir" @click.stop="excluirAtivo">
+            <button v-if="ativo" class="btn-excluir" @click.stop="confirmarExclusao">
               <span class="material-icons">delete</span>
               Excluir Ativo
             </button>
@@ -28,7 +28,8 @@
           <p>Carregando ativo...</p>
         </div>
 
-        <div v-else class="cards-container">
+        <!-- Conteúdo principal quando o ativo estiver carregado -->
+        <div v-else-if="ativo" class="cards-container">
           <!-- Card principal -->
           <div class="card-form">
             <!-- VISUALIZAÇÃO -->
@@ -54,16 +55,8 @@
                 <p class="info-text">{{ ativo.ambiente.localizacao }}</p>
               </div>
 
-              <div class="date-info">
-                <div class="date-container left">
-                  <h3 class="date-title">Criado em</h3>
-                  <p class="info-text">{{ ativo.criadoEm }}</p>
-                </div>
-                <div class="date-container right">
-                  <h3 class="date-title">Atualizado em</h3>
-                  <p class="info-text">{{ ativo.atualizadoEm }}</p>
-                </div>
-              </div>
+              
+              
             </div>
 
             <!-- EDIÇÃO -->
@@ -101,9 +94,9 @@
                   <span class="material-icons">close</span>
                   Cancelar
                 </button>
-                <button class="btn-salvar" @click="salvarEdicao">
+                <button class="btn-salvar" @click="confirmarEdicao" :disabled="isLoading">
                   <span class="material-icons">save</span>
-                  Salvar Alterações
+                  {{ isLoading ? 'Salvando...' : 'Salvar Alterações' }}
                 </button>
               </div>
             </div>
@@ -113,7 +106,7 @@
           <div class="card-summary">
             <h2 class="card-title">Ações</h2>
             <div class="action-buttons">
-              <button class="btn-secondary" @click="alterarStatus" :disabled="editando">
+              <button class="btn-secondary" @click="alterarStatus" :disabled="editando || isLoading">
                 <span class="material-icons">
                   {{ ativo.status === 'ATIVO' ? 'build' : 'check_circle' }}
                 </span>
@@ -133,24 +126,66 @@
                 <span class="info-label">Ambiente:</span>
                 <span class="info-value">{{ ativo.ambiente.nome }}</span>
               </div>
-              <div class="info-item">
-                <span class="info-label">Localização:</span>
-                <span class="info-value">{{ ativo.ambiente.localizacao }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">QR Code:</span>
-                <span class="info-value">{{ ativo.qrCode }}</span>
-              </div>
+              
             </div>
           </div>
         </div>
+
+        <!-- Mensagem quando o ativo não for encontrado -->
+        <div v-else class="error-container">
+          <p>Ativo não encontrado.</p>
+          <button class="btn-voltar" @click="$router.push('/adm/gestao-ativos')">
+            Voltar para Gestão de Ativos
+          </button>
+        </div>
       </div>
     </main>
+
+    <!-- Popup de Confirmação -->
+    <div v-if="showPopup" class="popup-overlay" @click.self="closePopup">
+      <div class="popup-container">
+        <div class="popup-header">
+          <span class="material-icons popup-icon" :class="popupType">
+            {{ popupIcon }}
+          </span>
+          <h3 class="popup-title">{{ popupTitle }}</h3>
+        </div>
+        
+        <div class="popup-content">
+          <p class="popup-message">{{ popupMessage }}</p>
+        </div>
+
+        <div class="popup-actions">
+          <button 
+            v-if="popupType === 'confirm'"
+            class="popup-btn popup-btn-cancel" 
+            @click="closePopup"
+            :disabled="isLoading"
+          >
+            Cancelar
+          </button>
+          <button 
+            class="popup-btn popup-btn-confirm" 
+            :class="popupType"
+            @click="handlePopupConfirm"
+            :disabled="isLoading"
+          >
+            {{ isLoading ? 'Processando...' : popupConfirmText }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">{{ loadingText }}</p>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, onMounted } from 'vue'
+import { defineComponent, ref, reactive, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
 import api from '@/services/api'
@@ -187,6 +222,16 @@ export default defineComponent({
     const ambientes = ref<Ambiente[]>([])
     const carregando = ref(true)
     const editando = ref(false)
+    const isLoading = ref(false)
+    const loadingText = ref('Processando...')
+
+    // Estados para o popup
+    const showPopup = ref(false)
+    const popupType = ref<'success' | 'error' | 'confirm'>('confirm')
+    const popupTitle = ref('')
+    const popupMessage = ref('')
+    const popupConfirmText = ref('')
+    const popupAction = ref<(() => void) | null>(null)
 
     const formEdit = reactive({
       nome: '',
@@ -203,6 +248,44 @@ export default defineComponent({
         })
 
         const data = response.data
+        console.log('🔍 Dados completos do ativo:', data) // Para debug
+
+        // 🔥 CORREÇÃO: Verificar a estrutura real dos dados do ambiente
+        let ambienteData = {
+          id: 0,
+          nome: 'Sem ambiente',
+          localizacao: '---'
+        }
+
+        // Diferentes possíveis estruturas que a API pode retornar
+        if (data.environment_FK) {
+          // Se environment_FK é um objeto completo
+          if (typeof data.environment_FK === 'object') {
+            ambienteData = {
+              id: data.environment_FK.id || 0,
+              nome: data.environment_FK.name || data.environment_FK.nome || 'Ambiente',
+              localizacao: data.environment_FK.description || data.environment_FK.localizacao || '---'
+            }
+          } 
+          // Se environment_FK é apenas o ID
+          else if (typeof data.environment_FK === 'number') {
+            // Buscar detalhes do ambiente separadamente
+            try {
+              const ambienteResponse = await api.get(`/environment/${data.environment_FK}/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+              const ambData = ambienteResponse.data
+              ambienteData = {
+                id: ambData.id,
+                nome: ambData.name,
+                localizacao: ambData.description || '---'
+              }
+            } catch (error) {
+              console.error('❌ Erro ao carregar detalhes do ambiente:', error)
+            }
+          }
+        }
+
         ativo.value = {
           id: data.id,
           nome: data.name,
@@ -211,17 +294,15 @@ export default defineComponent({
           qrCode: data.qr_code || '---',
           criadoEm: new Date(data.created_at).toLocaleString('pt-BR'),
           atualizadoEm: new Date(data.updated_at).toLocaleString('pt-BR'),
-          ambiente: {
-            id: data.environment_FK?.id || 0,
-            nome: data.environment_FK?.name || 'Sem ambiente',
-            localizacao: data.environment_FK?.description || '---'
-          }
+          ambiente: ambienteData
         }
         carregando.value = false
       } catch (error) {
         console.error('❌ Erro ao carregar ativo:', error)
-        alert('Erro ao carregar o ativo.')
-        router.push('/adm/gestao-ativos')
+        showCustomPopup('error', 'Erro', 'Erro ao carregar o ativo.', 'OK', () => {
+          router.push('/adm/gestao-ativos')
+        })
+        carregando.value = false
       }
     }
 
@@ -230,11 +311,17 @@ export default defineComponent({
         const response = await api.get('/environment/', {
           headers: { Authorization: `Bearer ${token}` },
         })
-        ambientes.value = response.data.results?.map((a: any) => ({
+        
+        // 🔥 CORREÇÃO: Verificar a estrutura da resposta
+        const data = Array.isArray(response.data) ? response.data : response.data.results
+        
+        ambientes.value = data?.map((a: any) => ({
           id: a.id,
           nome: a.name,
           localizacao: a.description || '---',
         })) || []
+        
+        console.log('✅ Ambientes carregados:', ambientes.value) // Para debug
       } catch (error) {
         console.error('❌ Erro ao carregar ambientes:', error)
       }
@@ -249,74 +336,214 @@ export default defineComponent({
       editando.value = true
     }
 
-    const cancelarEdicao = () => (editando.value = false)
-
-   const salvarEdicao = async () => {
-  if (!ativo.value) return
-
-  try {
-    const payload = {
-      name: formEdit.nome.trim(),
-      description: formEdit.descricao.trim(),
-      environment: Number(formEdit.ambiente.id),
-      status: formEdit.status.toUpperCase()
+    const cancelarEdicao = () => {
+      editando.value = false
     }
 
-    const response = await api.patch(`/ativo/${ativo.value.id}/`, payload, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const confirmarEdicao = () => {
+      if (!ativo.value) return
 
-    ativo.value = {
-      ...ativo.value,
-      nome: response.data.name,
-      descricao: response.data.description,
-      status: response.data.status,
-      atualizadoEm: new Date(response.data.updated_at).toLocaleString('pt-BR'),
-      ambiente: {
-        id: response.data.environment_FK?.id || payload.environment_FK,
-        nome: response.data.environment_FK?.name || 'Sem ambiente',
-        localizacao: response.data.environment_FK?.description || '---'
+      // Validações básicas
+      if (!formEdit.nome.trim()) {
+        showCustomPopup('error', 'Campo obrigatório', 'Informe o nome do ativo.', 'OK')
+        return
+      }
+      if (!formEdit.descricao.trim()) {
+        showCustomPopup('error', 'Campo obrigatório', 'Informe a descrição do ativo.', 'OK')
+        return
+      }
+      if (!formEdit.ambiente.id) {
+        showCustomPopup('error', 'Campo obrigatório', 'Selecione um ambiente.', 'OK')
+        return
+      }
+
+      showCustomPopup(
+        'confirm',
+        'Confirmar Edição',
+        'Tem certeza que deseja salvar as alterações neste ativo?',
+        'Salvar',
+        salvarEdicao
+      )
+    }
+
+    const salvarEdicao = async () => {
+      if (!ativo.value) return
+
+      isLoading.value = true
+      loadingText.value = 'Salvando alterações...'
+
+      try {
+        const payload = {
+          name: formEdit.nome.trim(),
+          description: formEdit.descricao.trim(),
+          environment_FK: Number(formEdit.ambiente.id),
+          status: formEdit.status.toUpperCase()
+        }
+
+        console.log('📤 Payload de edição:', payload) // Para debug
+
+        const response = await api.patch(`/ativo/${ativo.value.id}/`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        console.log('✅ Resposta da edição:', response.data) // Para debug
+
+        // Atualiza o objeto ativo com os dados da resposta
+        if (ativo.value) {
+          ativo.value.nome = response.data.name
+          ativo.value.descricao = response.data.description
+          ativo.value.status = response.data.status
+          ativo.value.atualizadoEm = new Date(response.data.updated_at).toLocaleString('pt-BR')
+          
+          // Atualiza o ambiente se necessário
+          const ambienteEncontrado = ambientes.value.find(amb => amb.id === Number(formEdit.ambiente.id))
+          if (ambienteEncontrado) {
+            ativo.value.ambiente = { ...ambienteEncontrado }
+          }
+        }
+
+        editando.value = false
+        
+        showCustomPopup(
+          'success',
+          'Sucesso!',
+          'Ativo atualizado com sucesso!',
+          'OK'
+        )
+      } catch (error: any) {
+        console.error('❌ Erro ao atualizar ativo:', error.response?.data || error)
+        
+        let errorMessage = 'Erro desconhecido ao atualizar ativo.'
+        if (error.response?.data) {
+          if (typeof error.response.data === 'object') {
+            errorMessage = Object.values(error.response.data).flat().join('\n')
+          } else {
+            errorMessage = error.response.data
+          }
+        }
+
+        showCustomPopup('error', 'Erro', errorMessage, 'OK')
+      } finally {
+        isLoading.value = false
       }
     }
-
-    editando.value = false
-    alert('✅ Ativo atualizado com sucesso!')
-  } catch (error: any) {
-    console.error('❌ Erro ao atualizar ativo:', error.response?.data || error)
-    alert('❌ Erro ao salvar alterações. Verifique os dados.')
-  }
-}
 
     const alterarStatus = async () => {
       if (!ativo.value) return
+      
       const novoStatus = ativo.value.status === 'ATIVO' ? 'EM_MANUTENCAO' : 'ATIVO'
-      try {
-        const response = await api.patch(`/ativo/${ativo.value.id}/`, { status: novoStatus }, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        ativo.value.status = response.data.status
-        ativo.value.atualizadoEm = new Date().toLocaleString('pt-BR')
-        alert(`✅ Ativo ${novoStatus === 'EM_MANUTENCAO' ? 'em manutenção' : 'reativado'} com sucesso!`)
-      } catch (error) {
-        console.error('❌ Erro ao alterar status:', error)
-        alert('Erro ao alterar status.')
-      }
+      const acao = novoStatus === 'EM_MANUTENCAO' ? 'colocar em manutenção' : 'reativar'
+      
+      showCustomPopup(
+        'confirm',
+        'Alterar Status',
+        `Tem certeza que deseja ${acao} este ativo?`,
+        'Confirmar',
+        async () => {
+          isLoading.value = true
+          loadingText.value = 'Alterando status...'
+
+          try {
+            const response = await api.patch(`/ativo/${ativo.value!.id}/`, 
+              { status: novoStatus }, 
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+            
+            if (ativo.value) {
+              ativo.value.status = response.data.status
+              ativo.value.atualizadoEm = new Date().toLocaleString('pt-BR')
+            }
+            
+            showCustomPopup(
+              'success',
+              'Sucesso!',
+              `Ativo ${novoStatus === 'EM_MANUTENCAO' ? 'colocado em manutenção' : 'reativado'} com sucesso!`,
+              'OK'
+            )
+          } catch (error) {
+            console.error('❌ Erro ao alterar status:', error)
+            showCustomPopup('error', 'Erro', 'Erro ao alterar status do ativo.', 'OK')
+          } finally {
+            isLoading.value = false
+          }
+        }
+      )
+    }
+
+    const confirmarExclusao = () => {
+      if (!ativo.value) return
+      
+      showCustomPopup(
+        'confirm',
+        'Confirmar Exclusão',
+        'Tem certeza que deseja excluir este ativo? Esta ação não pode ser desfeita.',
+        'Excluir',
+        excluirAtivo
+      )
     }
 
     const excluirAtivo = async () => {
       if (!ativo.value) return
-      if (!confirm('Tem certeza que deseja excluir este ativo?')) return
+      
+      isLoading.value = true
+      loadingText.value = 'Excluindo ativo...'
+
       try {
         await api.delete(`/ativo/${ativo.value.id}/`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        alert('🗑️ Ativo excluído com sucesso!')
-        router.push('/adm/gestao-ativos')
+        
+        showCustomPopup(
+          'success',
+          'Sucesso!',
+          'Ativo excluído com sucesso!',
+          'OK',
+          () => router.push('/adm/gestao-ativos')
+        )
       } catch (error) {
         console.error('❌ Erro ao excluir ativo:', error)
-        alert('Erro ao excluir ativo.')
+        showCustomPopup('error', 'Erro', 'Erro ao excluir ativo.', 'OK')
+      } finally {
+        isLoading.value = false
       }
     }
+
+    // Função para mostrar popup personalizado
+    const showCustomPopup = (
+      type: 'success' | 'error' | 'confirm',
+      title: string,
+      message: string,
+      confirmText: string,
+      action?: () => void
+    ) => {
+      popupType.value = type
+      popupTitle.value = title
+      popupMessage.value = message
+      popupConfirmText.value = confirmText
+      popupAction.value = action || null
+      showPopup.value = true
+    }
+
+    const closePopup = () => {
+      showPopup.value = false
+      popupAction.value = null
+    }
+
+    const handlePopupConfirm = () => {
+      if (popupAction.value) {
+        popupAction.value()
+      }
+      closePopup()
+    }
+
+    const popupIcon = computed(() => {
+      switch (popupType.value) {
+        case 'success': return 'check_circle'
+        case 'error': return 'error'
+        case 'confirm': return 'help'
+        default: return 'info'
+      }
+    })
 
     const statusClass = (status: string) => {
       return status === 'ATIVO' ? 'status-ativo' : 'status-manutencao'
@@ -342,21 +569,32 @@ export default defineComponent({
       ambientes,
       carregando,
       editando,
+      isLoading,
       formEdit,
+      showPopup,
+      popupType,
+      popupTitle,
+      popupMessage,
+      popupConfirmText,
+      popupIcon,
+      loadingText,
       iniciarEdicao,
       cancelarEdicao,
+      confirmarEdicao,
       salvarEdicao,
       alterarStatus,
+      confirmarExclusao,
       excluirAtivo,
       statusClass,
       statusIcon,
       formatarStatus,
       closeProfileMenu,
+      closePopup,
+      handlePopupConfirm,
     }
   },
 })
 </script>
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
@@ -537,7 +775,7 @@ html, body, #app {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 30px; /* AUMENTADO o espaçamento entre seções */
+  gap: 30px;
   min-height: 500px;
 }
 
@@ -563,7 +801,7 @@ html, body, #app {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px; /* AUMENTADO o espaçamento abaixo do header */
+  margin-bottom: 15px;
 }
 
 .ativo-id {
@@ -604,7 +842,7 @@ html, body, #app {
   font-size: 20px;
   font-weight: bold;
   color: #000;
-  margin-bottom: 20px; /* AUMENTADO o espaçamento abaixo do nome */
+  margin-bottom: 20px;
   text-align: left;
 }
 
@@ -618,7 +856,7 @@ html, body, #app {
   color: #000;
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 12px; /* AUMENTADO o espaçamento abaixo dos títulos */
+  margin-bottom: 12px;
 }
 
 .info-text,
@@ -626,7 +864,7 @@ html, body, #app {
   color: #555;
   font-size: 14px;
   line-height: 1.5;
-  margin-bottom: 8px; /* AUMENTADO o espaçamento entre linhas de texto */
+  margin-bottom: 8px;
 }
 
 .date-info {
@@ -634,8 +872,8 @@ html, body, #app {
   justify-content: space-between;
   width: 100%;
   gap: 20px;
-  margin-top: auto; /* GARANTE que fique no final do card */
-  padding-top: 20px; /* ESPAÇAMENTO acima das datas */
+  margin-top: auto;
+  padding-top: 20px;
 }
 
 .date-container {
@@ -655,7 +893,7 @@ html, body, #app {
 /* Seções do Formulário - ESPAÇAMENTOS AUMENTADOS */
 .form-section {
   text-align: left;
-  margin-bottom: 25px; /* AUMENTADO o espaçamento entre campos */
+  margin-bottom: 25px;
 }
 
 .form-section:last-of-type {
@@ -666,7 +904,7 @@ html, body, #app {
   color: #000;
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 12px; /* AUMENTADO o espaçamento abaixo dos títulos */
+  margin-bottom: 12px;
   text-align: left;
 }
 
@@ -674,7 +912,7 @@ html, body, #app {
 .form-textarea,
 .form-select {
   width: 100%;
-  padding: 10px 0; /* AUMENTADO o padding vertical */
+  padding: 10px 0;
   border: none;
   border-bottom: 1px solid #ccc;
   background-color: transparent;
@@ -694,8 +932,8 @@ html, body, #app {
 .form-textarea {
   resize: vertical;
   font-family: inherit;
-  min-height: 120px; /* AUMENTADO a altura mínima */
-  padding: 12px 0; /* AUMENTADO o padding para textarea */
+  min-height: 120px;
+  padding: 12px 0;
 }
 
 .form-select {
@@ -713,8 +951,8 @@ html, body, #app {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  margin-top: auto; /* GARANTE que fique no final do card */
-  padding-top: 30px; /* AUMENTADO o espaçamento acima dos botões */
+  margin-top: auto;
+  padding-top: 30px;
 }
 
 .btn-cancelar {
@@ -752,9 +990,14 @@ html, body, #app {
   transition: all 0.2s;
 }
 
-.btn-salvar:hover {
+.btn-salvar:hover:not(:disabled) {
   background-color: #059669;
   color: white;
+}
+
+.btn-salvar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-cancelar .material-icons,
@@ -846,6 +1089,223 @@ html, body, #app {
   font-weight: 500;
 }
 
+/* Container de erro */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.error-container p {
+  font-size: 18px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.btn-voltar {
+  padding: 12px 24px;
+  background-color: indigo;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-voltar:hover {
+  background-color: #4b0082;
+}
+
+/* POPUP STYLES - MESMO ESTILO DA PÁGINA NOVO_ATIVO */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.popup-container {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 400px;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 24px 16px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.popup-icon {
+  font-size: 28px;
+  border-radius: 50%;
+  padding: 4px;
+}
+
+.popup-icon.success {
+  color: #065f46;
+  background-color: #d1fae5;
+}
+
+.popup-icon.error {
+  color: #842029;
+  background-color: #f8d7da;
+}
+
+.popup-icon.confirm {
+  color: #084298;
+  background-color: #cfe2ff;
+}
+
+.popup-title {
+  color: #000;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.popup-content {
+  padding: 20px 24px;
+}
+
+.popup-message {
+  color: #333;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  text-align: left;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 24px 24px 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.popup-btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 80px;
+}
+
+.popup-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.popup-btn-cancel {
+  background-color: #f8f9fa;
+  color: #333;
+  border: 1px solid #d0d0d0;
+}
+
+.popup-btn-cancel:hover:not(:disabled) {
+  background-color: #e9ecef;
+}
+
+.popup-btn-confirm {
+  background-color: #000;
+  color: #fff;
+}
+
+.popup-btn-confirm:hover:not(:disabled) {
+  background-color: #333;
+}
+
+.popup-btn-confirm.success {
+  background-color: #065f46;
+}
+
+.popup-btn-confirm.success:hover:not(:disabled) {
+  background-color: #054c38;
+}
+
+.popup-btn-confirm.error {
+  background-color: #842029;
+}
+
+.popup-btn-confirm.error:hover:not(:disabled) {
+  background-color: #6a1a21;
+}
+
+/* LOADING OVERLAY */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #000;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.loading-text {
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ANIMATIONS */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* RESPONSIVIDADE */
 @media (max-width: 1024px) {
   .main-content {
@@ -922,6 +1382,19 @@ html, body, #app {
   
   .form-actions {
     flex-direction: column;
+  }
+
+  .popup-container {
+    width: 95%;
+    margin: 20px;
+  }
+
+  .popup-actions {
+    flex-direction: column;
+  }
+
+  .popup-btn {
+    width: 100%;
   }
 }
 

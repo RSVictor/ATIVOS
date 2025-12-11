@@ -151,6 +151,7 @@ export default defineComponent({
     const ordemExibicao = ref('recente')
     const pesquisa = ref('')
     const carregando = ref(true)
+    const closeProfileMenu = () => {}
 
     const usuario = ref({
       nome: auth.user?.name || 'Usuário',
@@ -199,7 +200,7 @@ export default defineComponent({
       carregarChamados()
     })
 
-    const closeProfileMenu = () => {}
+
 
     const goToChamadoDetalhado = (id: number) => {
       router.push({ name: 'ChamadoDetalhado', params: { id } })
@@ -344,7 +345,6 @@ const getTecnicoEmail = (chamado: Chamado) => {
       chamados,
       carregando,
       carregarChamados,
-      closeProfileMenu,
       goToChamadoDetalhado,
       filtrados,
       chamadosOrdenados,
@@ -356,6 +356,7 @@ const getTecnicoEmail = (chamado: Chamado) => {
       formatarData,
       formatarStatus,
       getTecnicoNome,
+      closeProfileMenu,
       getTecnicoEmail
     }
   }

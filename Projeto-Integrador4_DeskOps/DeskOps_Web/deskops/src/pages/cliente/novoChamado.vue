@@ -177,7 +177,7 @@ export default defineComponent({
 
     const imagemURL = ref<string | null>(null)
     const imagem = ref<File | null>(null)
-
+    const closeProfileMenu = () => {}
 
     // 🔹 Opções fixas
     const categorias = ref(['Manutenção', 'Suporte', 'Instalação', 'Rede', 'Software', 'Hardware'])
@@ -333,6 +333,7 @@ export default defineComponent({
       ativos,
       ativoSelecionado,
       ambientes,
+      closeProfileMenu,
       ambienteSelecionado
     }
   },

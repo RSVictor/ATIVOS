@@ -167,6 +167,7 @@ export default defineComponent({
     const router = useRouter()
     const auth = useAuthStore()
     const novoStatus = ref('')
+    const closeProfileMenu = () => {}
 
     // ✅ inicialização segura (evita null)
     const chamado = ref<any>({
@@ -433,6 +434,7 @@ const reabrirChamado = async () => {
       statusClass,
       statusIcon,
       prioridadeClass,
+      closeProfileMenu,
       prioridadeIcon
     }
   }

@@ -121,6 +121,7 @@ export default defineComponent({
     const filtroPrioridade = ref('todos')
     const ordemExibicao = ref('recente')
     const pesquisa = ref('')
+    const closeProfileMenu = () => {}
 
     const usuario = ref({
       nome: auth.user?.name || 'Técnico',
@@ -288,6 +289,7 @@ const chamadosFiltrados = data.filter((c: any) => {
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
+      closeProfileMenu,
       goToChamadoDetalhado,
     }
   },

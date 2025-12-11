@@ -130,6 +130,8 @@ export default defineComponent({
 
     const chamado = ref<any>(null)
     const tecnico = ref<any>(null)
+    
+    const closeProfileMenu = () => {}
 
     // ✅ Função para buscar os detalhes do chamado
     const carregarChamado = async () => {
@@ -264,6 +266,7 @@ export default defineComponent({
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
+      closeProfileMenu,
       encerrarChamado
     }
   },
