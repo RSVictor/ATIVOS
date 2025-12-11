@@ -14,7 +14,7 @@
           <div class="metric-card clickable" @click="navigateTo('/adm/gestao-chamado')">
             <div class="metric-header">
               <span class="material-icons metric-icon status-aberto">circle</span>
-              <h3 class="metric-title">Chamados Total</h3>
+              <h3 class="metric-title">Chamados Abertos</h3>
             </div>
             <div class="metric-value">{{ metrics.chamadosAbertos }}</div>
             <div class="metric-trend positive">
@@ -110,20 +110,20 @@
 
         <!-- Gráficos -->
         <div class="charts-container">
-          <!-- Gráfico de Chamados -->
+          <!-- Gráfico de Chamados - BARRAS -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title">Chamados por Status (Últimos 30 dias)</h3>
+              <h3 class="chart-title">Distribuição de Chamados por Status</h3>
             </div>
             <div class="chart-content">
               <canvas ref="chamadosChart"></canvas>
             </div>
           </div>
 
-          <!-- Gráfico de Usuários -->
-          <div class="chart-card">
+          <!-- Gráfico de Usuários - PIZZA -->
+          <div class="chart-card pie-chart-card">
             <div class="chart-header">
-              <h3 class="chart-title">Usuários Ativos (Últimos 30 dias)</h3>
+              <h3 class="chart-title">Distribuição de Usuários</h3>
             </div>
             <div class="chart-content">
               <canvas ref="usuariosChart"></canvas>
@@ -145,6 +145,16 @@ import api from '@/services/api'
 
 Chart.register(...registerables)
 
+interface Chamado {
+  id: number
+  title: string
+  status: string
+  prioridade: string
+  update_date: string
+  creator?: { name: string; email: string }
+  employee?: { name: string; email: string }
+}
+
 interface Usuario {
   id: number
   name: string
@@ -152,14 +162,19 @@ interface Usuario {
   is_active: boolean
 }
 
-interface Chamado {
-  status: string
+interface Ambiente {
+  id: number
+  name: string
+}
+
+interface Ativo {
+  id: number
+  name: string
 }
 
 export default defineComponent({
   name: 'Dashboard',
   components: { AdmSidebar },
-
   setup() {
     const router = useRouter()
     const auth = useAuthStore()
@@ -184,9 +199,7 @@ export default defineComponent({
     const closeProfileMenu = () => {}
     const navigateTo = (route: string) => router.push(route)
 
-    // ---------------------------------------------------------
-    // 🚀 CARREGAR DADOS (VERSÃO CORRIGIDA)
-    // ---------------------------------------------------------
+    // 🧩 Carregar dados do backend
     const carregarDados = async () => {
       const token = auth.access
       if (!token) {
@@ -195,134 +208,232 @@ export default defineComponent({
       }
 
       try {
-        // -----------------------
-        // 1️⃣ CHAMADOS
-        // -----------------------
+        // ✅ Chamados
         const chamadosResp = await api.get('/chamados/', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
+
         const chamados: Chamado[] = chamadosResp.data.results || chamadosResp.data
-
-        metrics.value.chamadosAbertos = chamados.length
-        metrics.value.chamadosConcluidos = chamados.filter((c: Chamado) =>
-          c.status?.toLowerCase().includes('conclu')
+        
+        // Contagem de status corrigida
+        metrics.value.chamadosAbertos = chamados.filter((c: Chamado) => 
+          c.status?.toLowerCase().includes('aberto') || 
+          c.status?.toLowerCase().includes('open')
+        ).length
+        
+        metrics.value.chamadosConcluidos = chamados.filter((c: Chamado) => 
+          c.status?.toLowerCase().includes('concluído') || 
+          c.status?.toLowerCase().includes('concluido') ||
+          c.status?.toLowerCase().includes('completed')
+        ).length
+        
+        metrics.value.chamadosAguardando = chamados.filter((c: Chamado) => 
+          c.status?.toLowerCase().includes('aguardando') || 
+          c.status?.toLowerCase().includes('waiting')
+        ).length
+        
+        metrics.value.chamadosAndamento = chamados.filter((c: Chamado) => 
+          c.status?.toLowerCase().includes('andamento') || 
+          c.status?.toLowerCase().includes('progress')
+        ).length
+        
+        metrics.value.chamadosCancelados = chamados.filter((c: Chamado) => 
+          c.status?.toLowerCase().includes('cancelado') || 
+          c.status?.toLowerCase().includes('cancelled')
         ).length
 
-        metrics.value.chamadosAguardando = chamados.filter((c: Chamado) =>
-          c.status?.toLowerCase().includes('aguard')
-        ).length
-
-        metrics.value.chamadosAndamento = chamados.filter((c: Chamado) =>
-          c.status?.toLowerCase().includes('andamento')
-        ).length
-
-        metrics.value.chamadosCancelados = chamados.filter((c: Chamado) =>
-          c.status?.toLowerCase().includes('cancel')
-        ).length
-
-        // -----------------------
-        // 2️⃣ USUÁRIOS
-        // -----------------------
+        // ✅ Usuários
         const usuariosResp = await api.get('/usuarios/', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
-
         const usuarios: Usuario[] = usuariosResp.data.results || usuariosResp.data
-
         metrics.value.totalUsuarios = usuarios.length
         metrics.value.usuariosAtivos = usuarios.filter((u: Usuario) => u.is_active).length
 
-        // -----------------------
-        // 3️⃣ AMBIENTES
-        // -----------------------
+        // ✅ Ambientes
         const ambientesResp = await api.get('/environment/', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
-
-        const ambientes = ambientesResp.data.results || ambientesResp.data
+        const ambientes: Ambiente[] = ambientesResp.data.results || ambientesResp.data
         metrics.value.totalAmbientes = ambientes.length
 
-        // -----------------------
-        // 4️⃣ ATIVOS
-        // -----------------------
+        // ✅ Ativos
         const ativosResp = await api.get('/ativo/', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
-
-        const ativos = ativosResp.data.results || ativosResp.data
+        const ativos: Ativo[] = ativosResp.data.results || ativosResp.data
         metrics.value.totalAtivos = ativos.length
 
-        console.log('📊 Métricas carregadas:', metrics.value)
+        console.log('✅ Métricas carregadas:', metrics.value)
 
+        // Atualiza gráficos com dados reais
         initCharts()
+
       } catch (error: any) {
-        console.error('❌ Erro ao carregar dashboard:', error)
+        console.error('❌ Erro ao carregar dados do dashboard:', error)
+        if (error.response) {
+          console.log('🧩 Código HTTP:', error.response.status)
+          console.log('🧩 Dados retornados:', error.response.data)
+        }
       }
     }
 
-    // ---------------------------------------------------------
-    // 🎨 GRÁFICOS
-    // ---------------------------------------------------------
+    // 🎨 Gráficos - COM DADOS REAIS DO BACKEND
     const initCharts = () => {
-      if (chamadosChartInstance) chamadosChartInstance.destroy()
-      if (usuariosChartInstance) usuariosChartInstance.destroy()
+      // Destruir gráficos existentes
+      if (chamadosChartInstance) {
+        chamadosChartInstance.destroy()
+      }
+      if (usuariosChartInstance) {
+        usuariosChartInstance.destroy()
+      }
 
-      // CHART 1 - Chamados
+      // Gráfico de Chamados - BARRAS COM DADOS REAIS
       if (chamadosChart.value) {
         const ctx = chamadosChart.value.getContext('2d')
         if (ctx) {
           chamadosChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
-              labels: ['Abertos', 'Concluídos', 'Aguardando', 'Andamento', 'Cancelados'],
+              labels: ['Abertos', 'Concluídos', 'Em Andamento', 'Aguardando', 'Cancelados'],
               datasets: [
                 {
-                  label: 'Chamados',
+                  label: 'Quantidade de Chamados',
                   data: [
                     metrics.value.chamadosAbertos,
                     metrics.value.chamadosConcluidos,
-                    metrics.value.chamadosAguardando,
                     metrics.value.chamadosAndamento,
+                    metrics.value.chamadosAguardando,
                     metrics.value.chamadosCancelados
                   ],
                   backgroundColor: [
-                    '#0f5132', '#065f46', '#856404', '#084298', '#842029'
-                  ]
+                    '#0f5132', // Aberto
+                    '#065f46', // Concluído
+                    '#084298', // Em Andamento
+                    '#856404', // Aguardando
+                    '#842029'  // Cancelado
+                  ],
+                  borderColor: [
+                    '#0a3a24',
+                    '#054c38',
+                    '#06357a',
+                    '#6b5200',
+                    '#6a1a21'
+                  ],
+                  borderWidth: 1,
+                  borderRadius: 4
                 }
               ]
             },
-            options: { responsive: true }
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: false
+                },
+                tooltip: {
+                  mode: 'index',
+                  intersect: false
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  grid: {
+                    color: 'rgba(0, 0, 0, 0.1)'
+                  },
+                  title: {
+                    display: true,
+                    text: 'Quantidade de Chamados'
+                  }
+                },
+                x: {
+                  grid: {
+                    display: false
+                  }
+                }
+              }
+            }
           })
         }
       }
 
-      // CHART 2 - Usuários
+      // Gráfico de Usuários - PIZZA COM DADOS REAIS
       if (usuariosChart.value) {
         const ctx = usuariosChart.value.getContext('2d')
         if (ctx) {
+          const usuariosInativos = metrics.value.totalUsuarios - metrics.value.usuariosAtivos
+          
           usuariosChartInstance = new Chart(ctx, {
             type: 'pie',
             data: {
-              labels: ['Ativos', 'Inativos'],
+              labels: ['Usuários Ativos', 'Usuários Inativos'],
               datasets: [
                 {
                   data: [
                     metrics.value.usuariosAtivos,
-                    metrics.value.totalUsuarios - metrics.value.usuariosAtivos
+                    usuariosInativos
                   ],
-                  backgroundColor: ['#198754', '#dc3545']
+                  backgroundColor: [
+                    '#1565c0', // Ativos - azul
+                    '#dc3545'  // Inativos - vermelho
+                  ],
+                  borderColor: [
+                    '#0d47a1',
+                    '#c62828'
+                  ],
+                  borderWidth: 2
                 }
               ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'top',
+                  align: 'start',
+                  labels: {
+                    usePointStyle: true,
+                    padding: 15,
+                    font: {
+                      size: 12
+                    },
+                    boxWidth: 12,
+                    boxHeight: 12
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      const label = context.label || '';
+                      const value = context.raw as number;
+                      const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                      const percentage = Math.round((value / total) * 100);
+                      return `${label}: ${value} (${percentage}%)`;
+                    }
+                  }
+                }
+              },
+              cutout: '0%'
             }
           })
         }
       }
     }
 
-    onMounted(() => carregarDados())
+    onMounted(() => {
+      carregarDados()
+    })
+
     onUnmounted(() => {
-      chamadosChartInstance?.destroy()
-      usuariosChartInstance?.destroy()
+      if (chamadosChartInstance) {
+        chamadosChartInstance.destroy()
+      }
+      if (usuariosChartInstance) {
+        usuariosChartInstance.destroy()
+      }
     })
 
     return {
@@ -335,8 +446,6 @@ export default defineComponent({
   }
 })
 </script>
-
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
@@ -535,7 +644,7 @@ html, body, #app {
   margin-bottom: 40px;
 }
 
-/* Card do Gráfico */
+/* Card do Gráfico - AMBOS COM MESMA ALTURA */
 .chart-card {
   background: #fff;
   padding: 0;
@@ -544,7 +653,7 @@ html, body, #app {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  height: 400px;
+  height: 400px; /* Altura igual para ambos */
 }
 
 .chart-header {
@@ -569,6 +678,29 @@ html, body, #app {
 .chart-content canvas {
   width: 100% !important;
   height: 100% !important;
+}
+
+/* Estilos específicos para o gráfico de pizza */
+.pie-chart-card .chart-content {
+  padding: 15px 20px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 20px);
+}
+
+.pie-chart-card .chart-content canvas {
+  flex: 1;
+  max-height: 320px !important;
+  max-width: 320px !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 auto;
+  align-self: center;
+}
+
+/* Ajuste para a legenda no topo e alinhada à esquerda */
+.pie-chart-card :deep(.chartjs-render-monitor) {
+  margin-top: 10px;
 }
 
 /* RESPONSIVIDADE */
@@ -620,7 +752,12 @@ html, body, #app {
   }
   
   .chart-card {
-    height: 300px;
+    height: 380px;
+  }
+  
+  .pie-chart-card .chart-content canvas {
+    max-height: 280px !important;
+    max-width: 280px !important;
   }
 }
 
@@ -636,6 +773,15 @@ html, body, #app {
   .metric-value {
     font-size: 28px;
   }
+  
+  .chart-card {
+    height: 350px;
+  }
+  
+  .pie-chart-card .chart-content canvas {
+    max-height: 240px !important;
+    max-width: 240px !important;
+  }
 }
 
 /* Estilos para telas muito grandes */
@@ -646,6 +792,15 @@ html, body, #app {
   
   .metrics-cards {
     grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .chart-card {
+    height: 420px;
+  }
+  
+  .pie-chart-card .chart-content canvas {
+    max-height: 340px !important;
+    max-width: 340px !important;
   }
 }
 </style>

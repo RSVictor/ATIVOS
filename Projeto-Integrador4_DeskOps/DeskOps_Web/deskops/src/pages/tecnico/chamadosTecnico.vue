@@ -59,13 +59,13 @@
                 @click="goToChamadoDetalhado(chamado.id)"
                 class="clickable-row"
               >
-                 <td>{{ chamado.update_date }}</td>
-                  <td>{{ chamado.id }}</td>
-                  <td>{{ chamado.title }}</td>
-                  <td>
+                <td>{{ formatarData(chamado.update_date) }}</td>
+                <td>{{ chamado.id }}</td>
+                <td>{{ chamado.title }}</td>
+                <td>
                   <div class="cliente-info">
                     <p>{{ chamado.creator?.name || '---' }}</p>
-                     <p class="cliente-email">{{ chamado.creator?.email || '---' }}</p>
+                    <p class="cliente-email">{{ chamado.creator?.email || '---' }}</p>
                   </div>
                 </td>
                 <td>
@@ -81,7 +81,7 @@
                     <span class="material-icons status-icon">
                       {{ statusIcon(chamado.status) }}
                     </span>
-                    {{ chamado.status }}
+                    {{ formatarStatus(chamado.status) }}
                   </span>
                 </td>
               </tr>
@@ -121,7 +121,6 @@ export default defineComponent({
     const filtroPrioridade = ref('todos')
     const ordemExibicao = ref('recente')
     const pesquisa = ref('')
-    const closeProfileMenu = () => {}
 
     const usuario = ref({
       nome: auth.user?.name || 'Técnico',
@@ -132,80 +131,138 @@ export default defineComponent({
     const chamados = ref<Chamado[]>([])
 
     const carregarChamados = async () => {
-  try {
-    const token = auth.access
-    if (!token) {
-      console.warn('⚠️ Sem token, redirecionando...')
-      router.push('/')
-      return
+      try {
+        const token = auth.access
+        if (!token) {
+          console.warn('⚠️ Sem token, redirecionando...')
+          router.push('/')
+          return
+        }
+
+        const response = await api.get('/chamados/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        const data = response.data.results || response.data
+        console.log('📦 Dados brutos da API:', data)
+        console.log('👤 Técnico logado ID:', auth.user?.id)
+
+        // ✅ Filtro para mostrar SOMENTE chamados atribuídos ao técnico logado
+        const chamadosFiltrados = data.filter((c: any) => {
+          // Ignora chamados sem técnico
+          if (!c.employee) return false
+
+          // Se o backend retornar apenas o ID
+          if (typeof c.employee === 'number') {
+            return c.employee === auth.user?.id
+          }
+
+          // Se o backend retornar objeto { id, name, email }
+          if (typeof c.employee === 'object') {
+            return c.employee.id === auth.user?.id
+          }
+
+          return false
+        })
+
+        console.log('✅ Chamados atribuídos a mim:', chamadosFiltrados)
+
+        chamados.value = chamadosFiltrados.map((c: any) => ({
+          id: c.id,
+          title: c.title || 'Sem título',
+          status: c.status || 'Sem status',
+          prioridade: c.prioridade || 'Não definida',
+          update_date: c.update_date,
+          creator: c.creator
+            ? { name: c.creator.name, email: c.creator.email }
+            : { name: '---', email: '---' },
+        }))
+      } catch (error: any) {
+        console.error('❌ Erro ao carregar chamados:', error.response?.data || error)
+      }
     }
-
-    const response = await api.get('/chamados/', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    const data = response.data.results || response.data
-    console.log('📦 Dados brutos da API:', data)
-
-    console.log('📦 Dados brutos da API:', data)
-console.log('👤 Técnico logado ID:', auth.user?.id)
-// ✅ Filtro para mostrar SOMENTE chamados atribuídos ao técnico logado
-const chamadosFiltrados = data.filter((c: any) => {
-  // Ignora chamados sem técnico
-  if (!c.employee) return false
-
-  // Se o backend retornar apenas o ID
-  if (typeof c.employee === 'number') {
-    return c.employee === auth.user?.id
-  }
-
-  // Se o backend retornar objeto { id, name, email }
-  if (typeof c.employee === 'object') {
-    return c.employee.id === auth.user?.id
-  }
-
-  return false
-})
-
-    console.log('✅ Chamados atribuídos a mim:', chamadosFiltrados)
-
-    chamados.value = chamadosFiltrados.map((c: any) => ({
-      id: c.id,
-      title: c.title || 'Sem título',
-      status: c.status || 'Sem status',
-      prioridade: c.prioridade || 'Não definida',
-      update_date: c.update_date
-        ? new Date(c.update_date).toLocaleString('pt-BR')
-        : '---',
-      creator: c.creator
-        ? { name: c.creator.name, email: c.creator.email }
-        : { name: '---', email: '---' },
-    }))
-  } catch (error: any) {
-    console.error('❌ Erro ao carregar chamados:', error.response?.data || error)
-  }
-}
-
-
 
     onMounted(() => {
       carregarChamados()
     })
 
-    // ✅ Filtros e ordenação
+    // ✅ Formatar data no padrão do código original (DD/MM/AAAA HH:MM)
+    const formatarData = (dataString: string) => {
+      if (!dataString) return '---'
+      try {
+        const data = new Date(dataString)
+        const dia = String(data.getDate()).padStart(2, '0')
+        const mes = String(data.getMonth() + 1).padStart(2, '0')
+        const ano = data.getFullYear()
+        const horas = String(data.getHours()).padStart(2, '0')
+        const minutos = String(data.getMinutes()).padStart(2, '0')
+        return `${dia}/${mes}/${ano} ${horas}:${minutos}`
+      } catch (error) {
+        console.error('Erro ao formatar data:', error)
+        return '---'
+      }
+    }
+
+    // ✅ Formatar status para exibição amigável
+    const formatarStatus = (status: string) => {
+      if (!status) return '---'
+      switch (status.toLowerCase()) {
+        case 'aguardando_atendimento': return 'Aguardando'
+        case 'em_andamento': return 'Em Andamento'
+        case 'concluido': return 'Concluído'
+        case 'aberto': return 'Aberto'
+        case 'cancelado': return 'Cancelado'
+        default: return status
+      }
+    }
+
+    // ✅ Função closeProfileMenu do original
+    const closeProfileMenu = () => {
+      // Esta função será chamada no clique da página para fechar o menu de perfil
+    }
+
+    // ✅ Filtros e ordenação - compatível com formato do backend
     const filtrados = computed(() => {
       return chamados.value.filter((c) => {
-        const status = (c.status || '').toLowerCase()
+        const statusOriginal = (c.status || '').toLowerCase()
+        const statusFormatado = formatarStatus(c.status).toLowerCase()
         const prioridade = (c.prioridade || '').toLowerCase()
         const titulo = (c.title || '').toLowerCase()
         const cliente = (c.creator?.name || '').toLowerCase()
         const busca = pesquisa.value.toLowerCase()
 
-        const matchStatus =
-          filtroStatus.value === 'todos' || status.includes(filtroStatus.value.toLowerCase())
+        // Mapeamento dos filtros para os valores do backend
+        let matchStatus = true
+        if (filtroStatus.value !== 'todos') {
+          const filtro = filtroStatus.value.toLowerCase()
+          switch (filtro) {
+            case 'aguardando':
+              matchStatus = statusOriginal === 'aguardando_atendimento'
+              break
+            case 'andamento':
+              matchStatus = statusOriginal === 'em_andamento'
+              break
+            case 'concluido':
+              matchStatus = statusOriginal === 'concluido'
+              break
+            case 'aberto':
+              matchStatus = statusOriginal === 'aberto'
+              break
+            case 'cancelado':
+              matchStatus = statusOriginal === 'cancelado'
+              break
+            default:
+              matchStatus = statusFormatado.includes(filtro)
+          }
+        }
+
         const matchPrioridade =
-          filtroPrioridade.value === 'todos' || prioridade === filtroPrioridade.value.toLowerCase()
-        const matchPesquisa = titulo.includes(busca) || cliente.includes(busca)
+          filtroPrioridade.value === 'todos' || 
+          prioridade === filtroPrioridade.value.toLowerCase()
+
+        const matchPesquisa = 
+          titulo.includes(busca) || 
+          cliente.includes(busca)
 
         return matchStatus && matchPrioridade && matchPesquisa
       })
@@ -228,23 +285,32 @@ const chamadosFiltrados = data.filter((c: any) => {
       router.push(`/tecnico/chamado-detalhado/${id}`)
     }
 
+    // ✅ Classes e ícones - compatíveis com formato do backend
     const statusClass = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'concluído': return 'status-concluido'
+      const statusLower = status.toLowerCase()
+      switch (statusLower) {
+        case 'concluído':
+        case 'concluido': return 'status-concluido'
         case 'aberto': return 'status-aberto'
+        case 'aguardando':
         case 'aguardando_atendimento': return 'status-aguardando'
-        case 'em andamento': return 'status-andamento'
+        case 'em andamento':
+        case 'em_andamento': return 'status-andamento'
         case 'cancelado': return 'status-cancelado'
         default: return ''
       }
     }
 
     const statusIcon = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'concluído': return 'check_circle'
+      const statusLower = status.toLowerCase()
+      switch (statusLower) {
+        case 'concluído':
+        case 'concluido': return 'check_circle'
         case 'aberto': return 'circle'
+        case 'aguardando':
         case 'aguardando_atendimento': return 'hourglass_top'
-        case 'em andamento': return 'autorenew'
+        case 'em andamento':
+        case 'em_andamento': return 'autorenew'
         case 'cancelado': return 'cancel'
         default: return 'help_outline'
       }
@@ -289,13 +355,14 @@ const chamadosFiltrados = data.filter((c: any) => {
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
+      formatarData,
+      formatarStatus,
       closeProfileMenu,
       goToChamadoDetalhado,
     }
   },
 })
 </script>
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

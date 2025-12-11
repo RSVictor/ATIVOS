@@ -55,8 +55,16 @@
                 <p class="info-text">{{ ativo.ambiente.localizacao }}</p>
               </div>
 
-              
-              
+              <div class="date-info">
+                <div class="date-container left">
+                  <h3 class="date-title">Criado em</h3>
+                  <p class="info-text">{{ ativo.criadoEm }}</p>
+                </div>
+                <div class="date-container right">
+                  <h3 class="date-title">Atualizado em</h3>
+                  <p class="info-text">{{ ativo.atualizadoEm }}</p>
+                </div>
+              </div>
             </div>
 
             <!-- EDIÇÃO -->
@@ -126,7 +134,14 @@
                 <span class="info-label">Ambiente:</span>
                 <span class="info-value">{{ ativo.ambiente.nome }}</span>
               </div>
-              
+              <div class="info-item">
+                <span class="info-label">Localização:</span>
+                <span class="info-value">{{ ativo.ambiente.localizacao }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">QR Code:</span>
+                <span class="info-value">{{ ativo.qrCode }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -248,44 +263,6 @@ export default defineComponent({
         })
 
         const data = response.data
-        console.log('🔍 Dados completos do ativo:', data) // Para debug
-
-        // 🔥 CORREÇÃO: Verificar a estrutura real dos dados do ambiente
-        let ambienteData = {
-          id: 0,
-          nome: 'Sem ambiente',
-          localizacao: '---'
-        }
-
-        // Diferentes possíveis estruturas que a API pode retornar
-        if (data.environment_FK) {
-          // Se environment_FK é um objeto completo
-          if (typeof data.environment_FK === 'object') {
-            ambienteData = {
-              id: data.environment_FK.id || 0,
-              nome: data.environment_FK.name || data.environment_FK.nome || 'Ambiente',
-              localizacao: data.environment_FK.description || data.environment_FK.localizacao || '---'
-            }
-          } 
-          // Se environment_FK é apenas o ID
-          else if (typeof data.environment_FK === 'number') {
-            // Buscar detalhes do ambiente separadamente
-            try {
-              const ambienteResponse = await api.get(`/environment/${data.environment_FK}/`, {
-                headers: { Authorization: `Bearer ${token}` },
-              })
-              const ambData = ambienteResponse.data
-              ambienteData = {
-                id: ambData.id,
-                nome: ambData.name,
-                localizacao: ambData.description || '---'
-              }
-            } catch (error) {
-              console.error('❌ Erro ao carregar detalhes do ambiente:', error)
-            }
-          }
-        }
-
         ativo.value = {
           id: data.id,
           nome: data.name,
@@ -294,7 +271,11 @@ export default defineComponent({
           qrCode: data.qr_code || '---',
           criadoEm: new Date(data.created_at).toLocaleString('pt-BR'),
           atualizadoEm: new Date(data.updated_at).toLocaleString('pt-BR'),
-          ambiente: ambienteData
+          ambiente: {
+            id: data.environment_FK?.id || 0,
+            nome: data.environment_FK?.name || 'Sem ambiente',
+            localizacao: data.environment_FK?.description || '---'
+          }
         }
         carregando.value = false
       } catch (error) {
@@ -311,17 +292,11 @@ export default defineComponent({
         const response = await api.get('/environment/', {
           headers: { Authorization: `Bearer ${token}` },
         })
-        
-        // 🔥 CORREÇÃO: Verificar a estrutura da resposta
-        const data = Array.isArray(response.data) ? response.data : response.data.results
-        
-        ambientes.value = data?.map((a: any) => ({
+        ambientes.value = response.data.results?.map((a: any) => ({
           id: a.id,
           nome: a.name,
           localizacao: a.description || '---',
         })) || []
-        
-        console.log('✅ Ambientes carregados:', ambientes.value) // Para debug
       } catch (error) {
         console.error('❌ Erro ao carregar ambientes:', error)
       }
@@ -380,13 +355,9 @@ export default defineComponent({
           status: formEdit.status.toUpperCase()
         }
 
-        console.log('📤 Payload de edição:', payload) // Para debug
-
         const response = await api.patch(`/ativo/${ativo.value.id}/`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         })
-
-        console.log('✅ Resposta da edição:', response.data) // Para debug
 
         // Atualiza o objeto ativo com os dados da resposta
         if (ativo.value) {

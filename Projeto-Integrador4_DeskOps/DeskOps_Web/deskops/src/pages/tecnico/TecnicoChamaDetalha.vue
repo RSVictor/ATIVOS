@@ -1,8 +1,7 @@
 <template>
   <div class="chamado-detalhado-page" @click="closeProfileMenu">
     <!-- Sidebar como componente -->
-    <tecnico-sidebar />
-
+    <tecnico-sidebar :usuario="usuario" />
 
     <!-- Conteúdo principal -->
     <main class="main-content">
@@ -39,11 +38,6 @@
             <div class="info-section">
               <h3>Categoria</h3>
               <p class="info-text">{{ chamado.categoria }}</p>
-            </div>
-
-               <div class="info-section">
-              <h3>Ambiente</h3>
-              <p class="info-text">{{ chamado.ambiente  }}</p>
             </div>
 
             <div class="info-section">
@@ -85,7 +79,7 @@
             <h2 class="card-title">Ações do Técnico</h2>
             
             <!-- Seletor para atribuir chamado -->
-           <div class="action-section" v-if="chamado.status === 'AGUARDANDO_ATENDIMENTO' && !chamado.tecnicoResponsavel">
+            <div class="action-section" v-if="chamado.status === 'Aguardando'">
               <h3>Atribuir Chamado</h3>
               <p class="summary-text">Este chamado está aguardando atribuição</p>
               <button class="btn-atribuir" @click="atribuirChamado">
@@ -94,12 +88,10 @@
               </button>
             </div>
 
-
             <!-- Ações para chamado em andamento -->
-            <div class="action-section" v-else-if="chamado.status === 'EM_ANDAMENTO'">
+            <div class="action-section" v-else-if="chamado.status === 'Em Andamento'">
               <h3>Gerenciar Chamado</h3>
               <p class="summary-text">Chamado em andamento</p>
-              
               
               <div class="action-buttons">
                 <button class="btn-concluir" @click="concluirChamado">
@@ -118,7 +110,7 @@
             </div>
 
             <!-- Status do chamado concluído -->
-            <div class="action-section" v-else-if="chamado.status === 'CONCLUIDO'">
+            <div class="action-section" v-else-if="chamado.status === 'Concluído'">
               <h3>Chamado Concluído</h3>
               <p class="summary-text">Este chamado foi finalizado</p>
               <button class="btn-reabrir" @click="reabrirChamado">
@@ -137,7 +129,6 @@
               <p v-else class="summary-text">Aguardando atribuição</p>
             </div>
 
-            
             <!-- Histórico de ações -->
             <div class="historico-section">
               <h3>Última Ação</h3>
@@ -153,232 +144,51 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/authStore'
-import api from '@/services/api'
+import { useRouter } from 'vue-router'
 import TecnicoSidebar from '@/components/layouts/tecnicoSidebar.vue'
 
 export default defineComponent({
   name: 'TecnicoChamadoDetalhado',
-  components: { TecnicoSidebar },
-
+  components: {
+    TecnicoSidebar
+  },
   setup() {
-    const route = useRoute()
     const router = useRouter()
-    const auth = useAuthStore()
     const novoStatus = ref('')
-    const closeProfileMenu = () => {}
-
-    // ✅ inicialização segura (evita null)
-    const chamado = ref<any>({
-      id: null,
-      titulo: '',
-      descricao: '',
-      categoria: '',
-      imagem: null,
-      status: '',
-      prioridade: '',
-      categorias: '',
-      ambiente: '---',
-      criadoEm: '',
-      atualizadoEm: '',
-      criadoPor: { nome: '', email: '' },
-      tecnicoResponsavel: null,
-      ultimaAcao: '',
-      dataUltimaAcao: ''
-    })
 
     const usuario = ref({
-  nome: 'Carregando...',
-  email: '',
-  tipoUsuario: 'Técnico'
-})
-
-    const carregarUsuario = async () => {
-  try {
-    const token = auth.access
-    if (!token) return
-
-    const response = await api.get('/me/', {
-      headers: { Authorization: `Bearer ${token}` }
+      nome: 'Victor Ribeiro',
+      email: 'victor@email.com',
+      dataNascimento: '15/03/1985',
+      cpf: '987.654.321-00',
+      endereco: 'Av. Técnica, 456, São Paulo, SP',
+      tipoUsuario: 'Técnico',
+      foto: '',
     })
 
-    const data = response.data
-      usuario.value = {
-      nome: data.name || 'Técnico',
-      email: data.email || 'sem@email.com',
-      tipoUsuario: data.role ? data.role.toUpperCase() : 'Técnico'
-    }
-
-    // opcional: sincroniza com o Pinia
-    auth.user = data
-  } catch (error: any) {
-    console.error('❌ Erro ao carregar usuário:', error.response?.data || error)
-  }
-}
-
-    // ✅ Função para carregar o chamado
-    const carregarChamado = async () => {
-      try {
-        const id = route.params.id
-        const token = auth.access
-
-        if (!id || !token) {
-          console.error('⚠️ Falta ID ou token')
-          router.push('/tecnico/chamados')
-          return
-        }
-
-        const response = await api.get(`/chamados/${id}/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
-        const data = response.data
-        chamado.value = {
-      id: data.id,
-      titulo: data.title || 'Sem título',
-      descricao: data.description || '---',
-      categoria: data.categoria || '---',
-      ambiente: data.environment?.name || '---',
-      imagem: data.photo || null,
-      status: data.status || '---',
-      prioridade: data.prioridade || '---',
-      criadoEm: data.dt_criacao
-        ? new Date(data.dt_criacao).toLocaleString('pt-BR')
-        : '---',
-      atualizadoEm: data.update_date
-        ? new Date(data.update_date).toLocaleString('pt-BR')
-        : '---',
-      criadoPor: data.creator
-        ? { nome: data.creator.name, email: data.creator.email }
-        : { nome: '---', email: '---' },
-      tecnicoResponsavel: data.employee
-        ? { nome: data.employee.name, email: data.employee.email }
-        : null,
-      ultimaAcao: data.ultima_acao || 'Sem ações registradas',
-      dataUltimaAcao: data.data_ultima_acao
-        ? new Date(data.data_ultima_acao).toLocaleString('pt-BR')
-        : '---'
-    }
-
-          } catch (error: any) {
-            console.error('❌ Erro ao carregar chamado:', error.response?.data || error)
-            alert('Erro ao carregar chamado.')
-            router.push('/tecnico/chamados')
-          }
-        }
-
-    // ✅ Atribuir chamado ao técnico logado
-const atribuirChamado = async () => {
-  if (!chamado.value) return
-  try {
-    const token = auth.access
-    const id = chamado.value.id
-
-    await api.patch(
-      `/chamados/${id}/`,
-      {
-        employee: auth.user.id,
-        status: 'EM_ANDAMENTO',
+    const chamado = ref({
+      id: 1024,
+      titulo: 'Erro ao acessar o painel administrativo',
+      descricao: 'Usuário relata que ao tentar acessar o painel, uma tela de erro 500 é exibida. Foi realizado teste em diferentes navegadores e o problema persiste.',
+      categoria: 'Suporte Técnico',
+      imagem: '',
+      status: 'Aguardando',
+      prioridade: 'Alta',
+      criadoEm: '10/10/2025 - 14:22',
+      atualizadoEm: '11/10/2025 - 09:10',
+      criadoPor: { 
+        nome: 'Lucas Santino', 
+        email: 'lucas@email.com' 
       },
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
+      tecnicoResponsavel: null as { nome: string; email: string } | null,
+      ultimaAcao: 'Chamado criado pelo cliente',
+      dataUltimaAcao: '10/10/2025 - 14:22'
+    })
 
-    chamado.value.status = 'EM_ANDAMENTO'
-    chamado.value.tecnicoResponsavel = {
-      nome: usuario.value.nome,
-      email: usuario.value.email,
-    }
-    chamado.value.ultimaAcao = 'Chamado atribuído ao técnico'
-    chamado.value.dataUltimaAcao = new Date().toLocaleString('pt-BR')
-    alert('✅ Chamado atribuído com sucesso!')
-  } catch (error: any) {
-    console.error('❌ Erro ao atribuir chamado:', error.response?.data || error)
-    alert('Erro ao atribuir chamado.')
-  }
-}
-
-// ✅ Concluir chamado
-const concluirChamado = async () => {
-  if (!chamado.value) return
-  try {
-    const token = auth.access
-    const id = chamado.value.id
-
-    await api.patch(
-      `/chamados/${id}/`,
-      { status: 'CONCLUIDO' },
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-
-    chamado.value.status = 'CONCLUIDO'
-    chamado.value.ultimaAcao = 'Chamado concluído pelo técnico'
-    chamado.value.dataUltimaAcao = new Date().toLocaleString('pt-BR')
-    alert('✅ Chamado concluído com sucesso!')
-  } catch (error: any) {
-    console.error('❌ Erro ao concluir chamado:', error.response?.data || error)
-    alert('Erro ao concluir chamado.')
-  }
-}
-
-// ✅ Alterar status manualmente
-const alterarStatus = async () => {
-  if (!novoStatus.value || !chamado.value) return
-  try {
-    const token = auth.access
-    const id = chamado.value.id
-
-    // Mapeia texto -> código aceito no backend
-    const statusMap: Record<string, string> = {
-      'Aguardando': 'AGUARDANDO_ATENDIMENTO',
-      'Em Andamento': 'EM_ANDAMENTO',
-      'Concluído': 'CONCLUIDO',
-      'Cancelado': 'CANCELADO',
+    const closeProfileMenu = () => {
+      // Esta função será chamada no clique da página para fechar o menu de perfil
     }
 
-    const backendStatus = statusMap[novoStatus.value] || novoStatus.value
-
-    await api.patch(
-      `/chamados/${id}/`,
-      { status: backendStatus },
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-
-    chamado.value.status = backendStatus
-    chamado.value.ultimaAcao = `Status alterado para "${novoStatus.value}"`
-    chamado.value.dataUltimaAcao = new Date().toLocaleString('pt-BR')
-    alert(`✅ Status alterado para ${novoStatus.value}!`)
-    novoStatus.value = ''
-  } catch (error: any) {
-    console.error('❌ Erro ao alterar status:', error.response?.data || error)
-    alert('Erro ao alterar status.')
-  }
-}
-
-// ✅ Reabrir chamado
-const reabrirChamado = async () => {
-  if (!chamado.value) return
-  try {
-    const token = auth.access
-    const id = chamado.value.id
-
-    await api.patch(
-      `/chamados/${id}/`,
-      { status: 'EM_ANDAMENTO' },
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-
-    chamado.value.status = 'EM_ANDAMENTO'
-    chamado.value.ultimaAcao = 'Chamado reaberto pelo técnico'
-    chamado.value.dataUltimaAcao = new Date().toLocaleString('pt-BR')
-    alert('✅ Chamado reaberto com sucesso!')
-  } catch (error: any) {
-    console.error('❌ Erro ao reabrir chamado:', error.response?.data || error)
-    alert('Erro ao reabrir chamado.')
-  }
-}
-
-       // ✅ Classes auxiliares
     const statusClass = (status: string) => {
       const s = status.toLowerCase()
       if (s.includes('concl')) return 'status-concluido'
@@ -417,31 +227,87 @@ const reabrirChamado = async () => {
       }
     }
 
+    const formatarPrioridade = (prioridade: string) => {
+      switch (prioridade.toLowerCase()) {
+        case 'alta': return 'Alta'
+        case 'media': return 'Média'
+        case 'baixa': return 'Baixa'
+        default: return prioridade
+      }
+    }
+
+    const atribuirChamado = () => {
+      chamado.value.status = 'Em Andamento'
+      chamado.value.tecnicoResponsavel = {
+        nome: usuario.value.nome,
+        email: usuario.value.email
+      }
+      chamado.value.ultimaAcao = 'Chamado atribuído ao técnico'
+      chamado.value.dataUltimaAcao = new Date().toLocaleString('pt-BR')
+      chamado.value.atualizadoEm = new Date().toLocaleString('pt-BR')
+      
+      // Simular ação no backend
+      console.log('Chamado atribuído:', chamado.value.id)
+    }
+
+    const concluirChamado = () => {
+      chamado.value.status = 'Concluído'
+      chamado.value.ultimaAcao = 'Chamado concluído pelo técnico'
+      chamado.value.dataUltimaAcao = new Date().toLocaleString('pt-BR')
+      chamado.value.atualizadoEm = new Date().toLocaleString('pt-BR')
+      
+      // Simular ação no backend
+      console.log('Chamado concluído:', chamado.value.id)
+    }
+
+    const alterarStatus = () => {
+      if (novoStatus.value) {
+        const statusAnterior = chamado.value.status
+        chamado.value.status = novoStatus.value
+        chamado.value.ultimaAcao = `Status alterado de "${statusAnterior}" para "${novoStatus.value}"`
+        chamado.value.dataUltimaAcao = new Date().toLocaleString('pt-BR')
+        chamado.value.atualizadoEm = new Date().toLocaleString('pt-BR')
+        novoStatus.value = ''
+        
+        // Simular ação no backend
+        console.log('Status alterado para:', chamado.value.status)
+      }
+    }
+
+    const reabrirChamado = () => {
+      chamado.value.status = 'Em Andamento'
+      chamado.value.ultimaAcao = 'Chamado reaberto pelo técnico'
+      chamado.value.dataUltimaAcao = new Date().toLocaleString('pt-BR')
+      chamado.value.atualizadoEm = new Date().toLocaleString('pt-BR')
+      
+      // Simular ação no backend
+      console.log('Chamado reaberto:', chamado.value.id)
+    }
+
+    // Simular carregamento dos dados do chamado
     onMounted(() => {
-      carregarChamado()
-      carregarUsuario()
+      // Aqui viria a chamada à API para carregar os dados do chamado
+      console.log('Carregando dados do chamado...')
     })
 
-    // ✅ retorna todas as funções usadas no template
-    return {
+    return { 
       chamado,
       usuario,
       novoStatus,
+      closeProfileMenu,
+      statusClass, 
+      statusIcon,
+      prioridadeClass,
+      prioridadeIcon,
+      formatarPrioridade,
       atribuirChamado,
       concluirChamado,
       alterarStatus,
-      reabrirChamado,
-      statusClass,
-      statusIcon,
-      prioridadeClass,
-      closeProfileMenu,
-      prioridadeIcon
+      reabrirChamado
     }
-  }
+  },
 })
 </script>
-
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

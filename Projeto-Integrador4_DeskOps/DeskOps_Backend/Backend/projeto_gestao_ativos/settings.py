@@ -30,7 +30,13 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
-CSRF_TRUSTED_ORIGINS = ['https://projeto-integrador4-desk-ops.vercel.app', 'deskops-v1-cyfhfecpc0decmd8.westus3-01.azurewebsites.net']
+CSRF_TRUSTED_ORIGINS = [
+    "https://ativos-xcoi-37vx7kott-victors-projects-4abb9994.vercel.app",
+    "https://deskops-v1-cyfhfecpc0decmd8.westus3-01.azurewebsites.net",
+    
+
+
+]
 
 # Application definition
 

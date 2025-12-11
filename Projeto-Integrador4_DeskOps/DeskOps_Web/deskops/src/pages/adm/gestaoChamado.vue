@@ -49,13 +49,13 @@
           <table class="chamados-table">
             <thead>
               <tr>
-                <th>Atualizado</th>
-                <th>ID</th>
-                <th>Título</th>
-                <th>Cliente</th>
-                <th>Técnico</th>
-                <th>Prioridade</th>
-                <th>Status</th>
+                <th class="col-atualizado">Atualizado</th>
+                <th class="col-id">ID</th>
+                <th class="col-titulo">Título</th>
+                <th class="col-cliente">Cliente</th>
+                <th class="col-tecnico">Técnico</th>
+                <th class="col-prioridade">Prioridade</th>
+                <th class="col-status">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -66,7 +66,9 @@
               >
                 <td>{{ chamado.update_date }}</td>
                 <td>{{ chamado.id }}</td>
-                <td>{{ chamado.title }}</td>
+                <td>
+                  <p class="chamado-titulo">{{ chamado.title }}</p>
+                </td>
                 <td>
                   <div class="cliente-info">
                     <p class="cliente-nome">{{ chamado.creator?.name || '---' }}</p>
@@ -188,21 +190,38 @@ export default defineComponent({
       return [...new Set(nomes)]
     })
 
-    // ✅ Filtro e ordenação
+    // ✅ Filtro e ordenação - CORRIGIDO
     const filtrados = computed(() => {
       return chamados.value.filter((c) => {
-        const matchStatus =
-          filtroStatus.value === 'todos' ||
-          (c.status || '').toLowerCase().includes(filtroStatus.value.toLowerCase())
+        // Filtro de Status - CORRIGIDO
+        let matchStatus = true
+        if (filtroStatus.value !== 'todos') {
+          const statusChamado = c.status?.toLowerCase() || ''
+          const statusFiltro = filtroStatus.value.toLowerCase()
+          
+          // Mapeamento correto dos status
+          if (statusFiltro === 'em andamento') {
+            matchStatus = statusChamado.includes('andamento') || statusChamado.includes('em andamento')
+          } else if (statusFiltro === 'aguardando_atendimento') {
+            matchStatus = statusChamado.includes('aguardando')
+          } else if (statusFiltro === 'concluido') {
+            matchStatus = statusChamado.includes('concluído') || statusChamado.includes('concluido')
+          } else {
+            matchStatus = statusChamado.includes(statusFiltro)
+          }
+        }
 
+        // Filtro de Prioridade
         const matchPrioridade =
           filtroPrioridade.value === 'todos' ||
           (c.prioridade || '').toLowerCase() === filtroPrioridade.value.toLowerCase()
 
+        // Filtro de Técnico
         const matchTecnico =
           filtroTecnico.value === 'todos' ||
           (c.employee?.name || '').toLowerCase().includes(filtroTecnico.value.toLowerCase())
 
+        // Filtro de Pesquisa
         const matchPesquisa =
           (c.title || '').toLowerCase().includes(pesquisa.value.toLowerCase()) ||
           (c.creator?.name || '').toLowerCase().includes(pesquisa.value.toLowerCase()) ||
@@ -227,27 +246,25 @@ export default defineComponent({
       }
     })
 
-    // ✅ Classes e ícones
+    // ✅ Classes e ícones - MANTIDO IGUAL AO CÓDIGO ORIGINAL
     const statusClass = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'concluído': return 'status-concluido'
-        case 'aberto': return 'status-aberto'
-        case 'aguardando_atendimento': return 'status-aguardando'
-        case 'em andamento': return 'status-andamento'
-        case 'cancelado': return 'status-cancelado'
-        default: return ''
-      }
+      const statusLower = status.toLowerCase();
+      if (statusLower.includes('concluído') || statusLower.includes('concluido')) return 'status-concluido'
+      if (statusLower.includes('aberto')) return 'status-aberto'
+      if (statusLower.includes('aguardando')) return 'status-aguardando'
+      if (statusLower.includes('andamento')) return 'status-andamento'
+      if (statusLower.includes('cancelado')) return 'status-cancelado'
+      return ''
     }
 
     const statusIcon = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'concluído': return 'check_circle'
-        case 'aberto': return 'circle'
-        case 'aguardando_atendimento': return 'hourglass_top'
-        case 'em andamento': return 'autorenew'
-        case 'cancelado': return 'cancel'
-        default: return 'help_outline'
-      }
+      const statusLower = status.toLowerCase();
+      if (statusLower.includes('concluído') || statusLower.includes('concluido')) return 'check_circle'
+      if (statusLower.includes('aberto')) return 'circle'
+      if (statusLower.includes('aguardando')) return 'hourglass_top'
+      if (statusLower.includes('andamento')) return 'autorenew'
+      if (statusLower.includes('cancelado')) return 'cancel'
+      return 'help_outline'
     }
 
     const prioridadeClass = (prioridade: string) => {
@@ -278,11 +295,13 @@ export default defineComponent({
     }
 
     const formatarStatus = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'aguardando_atendimento': return 'Aguardando'
-        case 'em andamento': return 'Em Andamento'
-        default: return status.charAt(0).toUpperCase() + status.slice(1)
-      }
+      const statusLower = status.toLowerCase();
+      if (statusLower.includes('aguardando')) return 'Aguardando'
+      if (statusLower.includes('andamento')) return 'Em Andamento'
+      if (statusLower.includes('concluído') || statusLower.includes('concluido')) return 'Concluído'
+      if (statusLower.includes('aberto')) return 'Aberto'
+      if (statusLower.includes('cancelado')) return 'Cancelado'
+      return status.charAt(0).toUpperCase() + status.slice(1)
     }
 
     const closeProfileMenu = () => {}
@@ -474,7 +493,7 @@ html, body, #app {
   border-bottom: none;
 }
 
-/* LARGURAS DAS COLUNAS OTIMIZADAS */
+/* LARGURAS DAS COLUNAS OTIMIZADAS - MESMO DO ORIGINAL */
 .col-atualizado {
   width: 11%;
   min-width: 100px;
@@ -510,7 +529,7 @@ html, body, #app {
   min-width: 90px;
 }
 
-/* Estilos para o conteúdo das células */
+/* Estilos para o conteúdo das células - MESMO DO ORIGINAL */
 .chamado-titulo {
   margin: 0;
   font-weight: 500;
@@ -538,7 +557,7 @@ html, body, #app {
   line-height: 1.2;
 }
 
-/* Status e Prioridade com ESTILO COMPACTO */
+/* Status e Prioridade com ESTILO COMPACTO - MESMO DO ORIGINAL */
 .status,
 .prioridade {
   display: inline-flex;
@@ -558,7 +577,7 @@ html, body, #app {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
-/* CORES DOS STATUS - IGUAL À IMAGEM */
+/* CORES DOS STATUS - EXATAMENTE IGUAL AO CÓDIGO ORIGINAL */
 .status-concluido {
   background-color: #d1fae5;
   color: #065f46;
@@ -584,7 +603,7 @@ html, body, #app {
   color: #842029;
 }
 
-/* CORES DAS PRIORIDADES - MESMO ESTILO DOS STATUS */
+/* CORES DAS PRIORIDADES - MESMO ESTILO DOS STATUS - IGUAL AO ORIGINAL */
 .prioridade-alta {
   background-color: #f8d7da;
   color: #842029;

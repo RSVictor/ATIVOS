@@ -59,16 +59,15 @@
                 @click="goToChamadoDetalhado(chamado.id)"
                 class="clickable-row"
               >
-                <td>{{ chamado.update_date }}</td>
+                <td>{{ formatarData(chamado.update_date) }}</td>
                 <td>{{ chamado.id }}</td>
                 <td>{{ chamado.title }}</td>
-               <td>
-                <div class="cliente-info">
-                  <p>{{ chamado.creator?.name || '---' }}</p>
-                  <p class="cliente-email">{{ chamado.creator?.email || '---' }}</p>
-                </div>
-              </td>
-
+                <td>
+                  <div class="cliente-info">
+                    <p>{{ chamado.creator?.name || '---' }}</p>
+                    <p class="cliente-email">{{ chamado.creator?.email || '---' }}</p>
+                  </div>
+                </td>
                 <td>
                   <span :class="['prioridade', prioridadeClass(chamado.prioridade)]">
                     <span class="material-icons prioridade-icon">
@@ -82,7 +81,7 @@
                     <span class="material-icons status-icon">
                       {{ statusIcon(chamado.status) }}
                     </span>
-                    {{ chamado.status }}
+                    {{ formatarStatus(chamado.status) }}
                   </span>
                 </td>
               </tr>
@@ -125,7 +124,6 @@ export default defineComponent({
     const filtroPrioridade = ref('todos')
     const ordemExibicao = ref('recente')
     const pesquisa = ref('')
-    const closeProfileMenu = () => {}
 
     const usuario = ref({
       nome: auth.user?.name || 'Técnico',
@@ -146,26 +144,23 @@ export default defineComponent({
         }
 
         const response = await api.get('/chamados/', {
-  headers: { Authorization: `Bearer ${token}` },
-})
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-    const data = response.data.results || response.data
-    chamados.value = data.map((c: any) => ({
-      id: c.id,
-      title: c.title || 'Sem título',
-      status: c.status || 'Sem status',
-      prioridade: c.prioridade || 'Não definida',
-      update_date: c.update_date
-        ? new Date(c.update_date).toLocaleString('pt-BR')
-        : '---',
-      creator: c.creator
-        ? { name: c.creator.name, email: c.creator.email }
-        : { name: '---', email: '---' },
-      tecnico: c.employee
-        ? { name: c.employee.name, email: c.employee.email }
-        : null
-    }))
-
+        const data = response.data.results || response.data
+        chamados.value = data.map((c: any) => ({
+          id: c.id,
+          title: c.title || 'Sem título',
+          status: c.status || 'Sem status',
+          prioridade: c.prioridade || 'Não definida',
+          update_date: c.update_date,
+          creator: c.creator
+            ? { name: c.creator.name, email: c.creator.email }
+            : { name: '---', email: '---' },
+          tecnico: c.employee
+            ? { name: c.employee.name, email: c.employee.email }
+            : null
+        }))
 
         console.log('✅ Chamados carregados:', chamados.value)
       } catch (error: any) {
@@ -181,24 +176,54 @@ export default defineComponent({
       carregarChamados()
     })
 
+    // ✅ Formatar data no padrão do código original
+    const formatarData = (dataString: string) => {
+      if (!dataString) return '---'
+      const data = new Date(dataString)
+      const dia = String(data.getDate()).padStart(2, '0')
+      const mes = String(data.getMonth() + 1).padStart(2, '0')
+      const ano = data.getFullYear()
+      const horas = String(data.getHours()).padStart(2, '0')
+      const minutos = String(data.getMinutes()).padStart(2, '0')
+      return `${dia}/${mes}/${ano} ${horas}:${minutos}`
+    }
+
+    // ✅ Formatar status para exibição
+    const formatarStatus = (status: string) => {
+      switch (status.toLowerCase()) {
+        case 'aguardando_atendimento': return 'Aguardando'
+        case 'em_andamento': return 'Em Andamento'
+        default: return status
+      }
+    }
+
     const filtrados = computed(() => {
-  return chamados.value.filter((c) => {
-    const matchStatus =
-      filtroStatus.value === 'todos' ||
-      (c.status || '').toLowerCase().includes(filtroStatus.value.toLowerCase())
+      return chamados.value.filter((c) => {
+        const statusNormalizado = c.status.toLowerCase()
+        const statusFiltro = filtroStatus.value.toLowerCase()
+        
+        let matchStatus = true
+        if (filtroStatus.value !== 'todos') {
+          if (statusFiltro === 'aguardando') {
+            matchStatus = statusNormalizado === 'aguardando_atendimento'
+          } else if (statusFiltro === 'andamento') {
+            matchStatus = statusNormalizado === 'em_andamento'
+          } else {
+            matchStatus = statusNormalizado.includes(statusFiltro)
+          }
+        }
 
-    const matchPrioridade =
-      filtroPrioridade.value === 'todos' ||
-      (c.prioridade || '').toLowerCase() === filtroPrioridade.value.toLowerCase()
+        const matchPrioridade =
+          filtroPrioridade.value === 'todos' ||
+          (c.prioridade || '').toLowerCase() === filtroPrioridade.value.toLowerCase()
 
-    const matchPesquisa =
-      (c.title || '').toLowerCase().includes(pesquisa.value.toLowerCase()) ||
-      (c.creator?.name || '').toLowerCase().includes(pesquisa.value.toLowerCase())
+        const matchPesquisa =
+          (c.title || '').toLowerCase().includes(pesquisa.value.toLowerCase()) ||
+          (c.creator?.name || '').toLowerCase().includes(pesquisa.value.toLowerCase())
 
-    return matchStatus && matchPrioridade && matchPesquisa
-  })
-})
-
+        return matchStatus && matchPrioridade && matchPesquisa
+      })
+    })
 
     // ✅ Ordenação
     const chamadosOrdenados = computed(() => {
@@ -219,12 +244,18 @@ export default defineComponent({
       router.push(`/tecnico/chamado-detalhado/${id}`)
     }
 
-    // ✅ Classes e ícones
+    const closeProfileMenu = () => {
+      // Esta função será chamada no clique da página para fechar o menu de perfil
+    }
+
+    // ✅ Classes e ícones - Mantendo o mesmo estilo do original
     const statusClass = (status: string) => {
       switch (status.toLowerCase()) {
-        case 'concluído': return 'status-concluido'
+        case 'concluído':
+        case 'concluido': return 'status-concluido'
         case 'aberto': return 'status-aberto'
         case 'aguardando_atendimento': return 'status-aguardando'
+        case 'em_andamento': 
         case 'em andamento': return 'status-andamento'
         case 'cancelado': return 'status-cancelado'
         default: return ''
@@ -233,9 +264,11 @@ export default defineComponent({
 
     const statusIcon = (status: string) => {
       switch (status.toLowerCase()) {
-        case 'concluído': return 'check_circle'
+        case 'concluído':
+        case 'concluido': return 'check_circle'
         case 'aberto': return 'circle'
         case 'aguardando_atendimento': return 'hourglass_top'
+        case 'em_andamento':
         case 'em andamento': return 'autorenew'
         case 'cancelado': return 'cancel'
         default: return 'help_outline'
@@ -281,13 +314,14 @@ export default defineComponent({
       prioridadeClass,
       prioridadeIcon,
       formatarPrioridade,
+      formatarData,
+      formatarStatus,
       closeProfileMenu,
       goToChamadoDetalhado
     }
   },
 })
 </script>
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');

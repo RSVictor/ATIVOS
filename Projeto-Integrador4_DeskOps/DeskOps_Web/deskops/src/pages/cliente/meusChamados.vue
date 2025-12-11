@@ -151,7 +151,6 @@ export default defineComponent({
     const ordemExibicao = ref('recente')
     const pesquisa = ref('')
     const carregando = ref(true)
-    const closeProfileMenu = () => {}
 
     const usuario = ref({
       nome: auth.user?.name || 'Usuário',
@@ -200,23 +199,22 @@ export default defineComponent({
       carregarChamados()
     })
 
-
+    const closeProfileMenu = () => {}
 
     const goToChamadoDetalhado = (id: number) => {
       router.push({ name: 'ChamadoDetalhado', params: { id } })
     }
 
     // Protegidas contra employee undefined
-      const getTecnicoNome = (chamado: Chamado) => {
-  if (!chamado.employee || chamado.employee.length === 0) return 'Sem técnico'
-  return chamado.employee[0].name || 'Sem técnico'
-}
+        const getTecnicoNome = (chamado: Chamado) => {
+        if (!chamado || !chamado.employee) return 'Sem técnico'
+        return chamado.employee.name || 'Sem técnico'
+      }
 
-const getTecnicoEmail = (chamado: Chamado) => {
-  if (!chamado.employee || chamado.employee.length === 0) return 'sem-tecnico@email.com'
-  return chamado.employee[0].email || 'sem-tecnico@email.com'
-}
-
+      const getTecnicoEmail = (chamado: Chamado) => {
+        if (!chamado || !chamado.employee) return 'sem-tecnico@email.com'
+        return chamado.employee.email || 'sem-tecnico@email.com'
+      }
 
 
     const formatarData = (dataString: string) => {
@@ -345,6 +343,7 @@ const getTecnicoEmail = (chamado: Chamado) => {
       chamados,
       carregando,
       carregarChamados,
+      closeProfileMenu,
       goToChamadoDetalhado,
       filtrados,
       chamadosOrdenados,
@@ -356,7 +355,6 @@ const getTecnicoEmail = (chamado: Chamado) => {
       formatarData,
       formatarStatus,
       getTecnicoNome,
-      closeProfileMenu,
       getTecnicoEmail
     }
   }
