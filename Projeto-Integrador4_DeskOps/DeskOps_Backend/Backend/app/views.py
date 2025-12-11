@@ -50,9 +50,7 @@ class RegisterView(APIView):
         data["is_staff"] = False
         data["cargo"] = "aguardando"
 
-        if "password" in data:
-            data["password"] = make_password(data["password"])
-
+        # NÃO faça make_password aqui — deixe o serializer cuidar
         serializer = UserSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -61,6 +59,7 @@ class RegisterView(APIView):
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     
 class UsuarioDetailView(generics.RetrieveUpdateAPIView):
     queryset = Users.objects.all()

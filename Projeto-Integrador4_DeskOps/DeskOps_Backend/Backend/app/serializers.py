@@ -20,11 +20,43 @@ class ReadWriteSerializer(object):
         return self.write_serializer_class
     
 
+from rest_framework import serializers
+from .models import Users
+
 class UserSerializer(serializers.ModelSerializer):
+    # campo de senha apenas para escrita
+    password = serializers.CharField(write_only=True, required=False, allow_null=True)
+
     class Meta:
         model = Users
-        fields = ['id', 'name', 'email', 'cargo', 'cpf', 'dt_nascimento', 'endereco', 'foto_user', 'is_active', 'is_staff',  'created_at','role']
-        read_only_fields = ['role']
+        fields = [
+            'id', 'name', 'email', 'cargo', 'cpf', 'dt_nascimento',
+            'endereco', 'foto_user', 'is_active', 'is_staff',
+            'created_at', 'role', 'password'
+        ]
+        read_only_fields = ['created_at']  # role NÃO precisa ser read-only se quer alterar via API
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        user = super().create(validated_data)
+        if password:
+            user.set_password(password)
+            user.save()
+        else:
+            # se não veio senha, garante que a conta não tenha senha insegura
+            user.set_unusable_password()
+            user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        # se veio senha, aplica hash corretamente
+        password = validated_data.pop('password', None)
+        instance = super().update(instance, validated_data)
+        if password:
+            instance.set_password(password)
+            instance.save()
+        return instance
+
 
 
 class EnvironmentSerializer(serializers.ModelSerializer):
