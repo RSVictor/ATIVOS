@@ -43,43 +43,129 @@
           <table class="ativos-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Nome</th>
-                <th>Descrição</th>
-                <th>Ambiente</th>
-                <th>Status</th>
+                <th class="col-id">ID</th>
+                <th class="col-nome">Nome</th>
+                <th class="col-descricao">Descrição</th>
+                <th class="col-ambiente">Ambiente</th>
+                <th class="col-status">Status</th>
+                <th class="col-qrcode">QR Code</th>
               </tr>
             </thead>
             <tbody>
               <tr
-              v-for="ativo in ativosFiltradosOrdenados"
-              :key="ativo.id"
-              class="clickable-row"
-              @click="verDetalhesAtivo(ativo.id)"
-            >
-              <td>{{ ativo.id }}</td>
-              <td>{{ ativo.nome }}</td>
-              <td>{{ ativo.descricao }}</td>
-              <td>{{ ativo.ambiente.nome }}</td>
-              <td>
-                <span :class="['status', statusClass(ativo.status)]">
-                  {{ formatarStatus(ativo.status) }}
-                </span>
-              </td>
-            </tr>
+                v-for="ativo in ativosFiltradosOrdenados"
+                :key="ativo.id"
+                class="clickable-row"
+                @click="verDetalhesAtivo(ativo.id)"
+              >
+                <td>{{ ativo.id }}</td>
+                <td>{{ ativo.nome }}</td>
+                <td>{{ ativo.descricao }}</td>
+                <td>{{ ativo.ambiente.nome }}</td>
+                <td>
+                  <span :class="['status', statusClass(ativo.status)]">
+                    <span class="material-icons status-icon">
+                      {{ statusIcon(ativo.status) }}
+                    </span>
+                    {{ formatarStatus(ativo.status) }}
+                  </span>
+                </td>
+                <td>
+                  <span 
+                    class="qr-code-available clickable-qr"
+                    @click.stop="abrirModalQRCode(ativo)"
+                  >
+                    <span class="material-icons">qr_code_2</span>
+                    Visualizar
+                  </span>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
       </div>
     </main>
+
+    <!-- Modal do QR Code -->
+    <div v-if="modalAberto" class="modal-overlay" @click="fecharModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2 class="modal-title">QR Code do Ativo</h2>
+          <button class="modal-close" @click="fecharModal">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Informações do Ativo -->
+          <div class="info-section">
+            <h3 class="info-title">Informações do Ativo</h3>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">ID:</span>
+                <span class="info-value">{{ ativoSelecionado?.id }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Nome:</span>
+                <span class="info-value">{{ ativoSelecionado?.nome }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Descrição:</span>
+                <span class="info-value">{{ ativoSelecionado?.descricao }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Ambiente:</span>
+                <span class="info-value">{{ ativoSelecionado?.ambiente.nome }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Status:</span>
+                <span :class="['info-value', statusClass(ativoSelecionado?.status || '')]">
+                  <span class="material-icons status-icon">
+                    {{ statusIcon(ativoSelecionado?.status || '') }}
+                  </span>
+                  {{ formatarStatus(ativoSelecionado?.status || '') }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- QR Code -->
+          <div class="qr-section">
+            <h3 class="qr-title">Código QR</h3>
+            <div class="qr-container">
+              <div class="qr-code-wrapper">
+                <qrcode-vue
+                  :value="qrCodeValue"
+                  :size="200"
+                  level="H"
+                  render-as="canvas"
+                  class="qr-code"
+                />
+                <p class="qr-subtext">ID: {{ ativoSelecionado?.id }}</p>
+              </div>
+            </div>
+            <div class="qr-actions">
+              <button class="btn-download" @click="downloadQRCode">
+                <span class="material-icons">download</span>
+                Baixar QR Code
+              </button>
+              <button class="btn-print" @click="imprimirQRCode">
+                <span class="material-icons">print</span>
+                Imprimir
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
-
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router' // ✅ IMPORTANTE
+import { useRouter } from 'vue-router'
 import AdmSidebar from '@/components/layouts/admSidebar.vue'
+import QrcodeVue from 'qrcode.vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -98,7 +184,10 @@ interface Ativo {
 
 export default defineComponent({
   name: 'GestaoAtivos',
-  components: { AdmSidebar },
+  components: { 
+    AdmSidebar,
+    QrcodeVue 
+  },
 
   setup() {
     const auth = useAuthStore()
@@ -107,10 +196,21 @@ export default defineComponent({
 
     const ativos = ref<Ativo[]>([])
     const ambientes = ref<Ambiente[]>([])
+    const modalAberto = ref(false)
+    const ativoSelecionado = ref<Ativo | null>(null)
 
     const filtroStatus = ref('todos')
     const filtroAmbiente = ref('todos')
     const pesquisa = ref('')
+
+    // Computed para gerar o valor do QR Code - ROTA PÚBLICA
+    const qrCodeValue = computed(() => {
+      if (!ativoSelecionado.value) return ''
+      
+      // URL que aponta para a página pública de detalhes do ativo
+      const baseUrl = window.location.origin
+      return `${baseUrl}/tech/ativo/${ativoSelecionado.value.id}`
+    })
 
     // 🔹 Buscar ativos da API
     const carregarAtivos = async () => {
@@ -166,9 +266,8 @@ export default defineComponent({
         const matchStatus =
           filtroStatus.value === 'todos' || a.status === filtroStatus.value
         const matchAmbiente =
-  filtroAmbiente.value === 'todos' ||
-  a.ambiente.id === Number(filtroAmbiente.value)
-
+          filtroAmbiente.value === 'todos' ||
+          a.ambiente.id === Number(filtroAmbiente.value)
         const matchPesquisa =
           a.nome.toLowerCase().includes(pesquisa.value.toLowerCase()) ||
           a.descricao.toLowerCase().includes(pesquisa.value.toLowerCase())
@@ -186,17 +285,53 @@ export default defineComponent({
       router.push('/adm/novo-ativo')
     }
 
-   const verDetalhesAtivo = (id: number) => {
-  router.push(`/adm/detalhes-ativo/${id}`)
-}
+    const verDetalhesAtivo = (id: number) => {
+      router.push(`/adm/detalhes-ativo/${id}`)
+    }
 
+    // Funções do Modal QR Code
+    const abrirModalQRCode = (ativo: Ativo) => {
+      ativoSelecionado.value = ativo
+      modalAberto.value = true
+    }
 
+    const fecharModal = () => {
+      modalAberto.value = false
+      ativoSelecionado.value = null
+    }
 
+    const downloadQRCode = () => {
+      if (!ativoSelecionado.value) return
+      
+      // Criar um elemento canvas temporário para download
+      const canvas = document.querySelector('.qr-code canvas') as HTMLCanvasElement
+      if (canvas) {
+        const link = document.createElement('a')
+        link.download = `qrcode-ativo-${ativoSelecionado.value.id}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+      }
+    }
+
+    const imprimirQRCode = () => {
+      // Simular impressão do QR Code
+      window.print()
+    }
 
     const closeProfileMenu = () => {}
 
+    // Função para determinar a classe do status
     const statusClass = (status: string) =>
       status === 'ATIVO' ? 'status-ativo' : 'status-manutencao'
+
+    // Função para determinar o ícone do status
+    const statusIcon = (status: string) => {
+      switch (status) {
+        case 'ATIVO': return 'check_circle'
+        case 'EM_MANUTENCAO': return 'build'
+        default: return ''
+      }
+    }
 
     const formatarStatus = (status: string) =>
       status === 'ATIVO' ? 'Ativo' : 'Em Manutenção'
@@ -213,10 +348,18 @@ export default defineComponent({
       filtroAmbiente,
       pesquisa,
       ativosFiltradosOrdenados,
+      modalAberto,
+      ativoSelecionado,
+      qrCodeValue,
       cadastrarAtivo,
-      verDetalhesAtivo,      
+      verDetalhesAtivo,
+      abrirModalQRCode,
+      fecharModal,
+      downloadQRCode,
+      imprimirQRCode,
       closeProfileMenu,
       statusClass,
+      statusIcon,
       formatarStatus,
     }
   },
@@ -479,7 +622,7 @@ html, body, #app {
   line-height: 1.2;
 }
 
-/* Status - ESTILO COMPACTO */
+/* Status - ESTILO COMPACTO COM ÍCONE */
 .status {
   display: inline-flex;
   align-items: center;
@@ -569,7 +712,7 @@ html, body, #app {
   background: #a8a8a8;
 }
 
-/* MODAL STYLES */
+/* MODAL STYLES - CORRIGIDOS */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -650,30 +793,46 @@ html, body, #app {
   font-size: 16px;
   font-weight: 600;
   margin: 0 0 16px 0;
+  text-align: center;
 }
 
 .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 16px;
+  align-items: center;
 }
 
 .info-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 8px;
 }
 
 .info-label {
   font-size: 12px;
   color: #666;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .info-value {
   font-size: 14px;
   color: #000;
-  font-weight: 500;
+  font-weight: 600;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+.info-value .status-icon {
+  font-size: 16px;
 }
 
 .qr-section {
@@ -685,6 +844,7 @@ html, body, #app {
   font-size: 16px;
   font-weight: 600;
   margin: 0 0 16px 0;
+  text-align: center;
 }
 
 .qr-container {
@@ -698,29 +858,25 @@ html, body, #app {
   align-items: center;
 }
 
-.qr-placeholder {
+.qr-code-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
 }
 
-.qr-icon {
-  font-size: 80px;
-  color: #d1d5db;
-}
-
-.qr-text {
-  color: #374151;
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0;
+.qr-code {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px;
+  background: white;
 }
 
 .qr-subtext {
   color: #6b7280;
   font-size: 12px;
   margin: 0;
+  font-weight: 500;
 }
 
 .qr-actions {
@@ -762,29 +918,6 @@ html, body, #app {
   background-color: #e5e7eb;
 }
 
-/* QR Code */
-.qr-code-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.qr-code {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 8px;
-  background: white;
-}
-
-.qr-subtext {
-  color: #6b7280;
-  font-size: 12px;
-  margin: 0;
-  font-weight: 500;
-}
-
-
 /* RESPONSIVIDADE */
 @media (max-width: 1024px) {
   .main-content {
@@ -816,6 +949,7 @@ html, body, #app {
 
   .info-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .qr-actions {
@@ -882,8 +1016,8 @@ html, body, #app {
     padding: 20px;
   }
 
-  .qr-icon {
-    font-size: 60px;
+  .info-item {
+    padding: 6px;
   }
 }
 
