@@ -111,7 +111,6 @@
   </div>
 </template>
 
-
 <script lang="ts">
 import { defineComponent, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -272,8 +271,6 @@ export default defineComponent({
   },
 })
 </script>
-
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
